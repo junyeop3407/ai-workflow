@@ -73,7 +73,7 @@ description: Use when the user asks to build a new app or program in this reposi
 1. **리뷰 대상 준비 + 2. Gemini에게 리뷰 요청**: `bash .claude/skills/build-app/cross-review.sh apps/<앱> <리뷰 기준>`
    - 리뷰 기준은 4단계 구현을 시작하기 직전 커밋. 4단계를 시작할 때 `git rev-parse --short HEAD`를 HANDOFF의 `리뷰 기준:` 줄에 적어 둔다. (기준을 안 주면 커밋 전이면 `git diff`, 브랜치 작업이면 `git diff main...HEAD`)
    - 스크립트가 변경분 + 변경된 파일 전체 + 그 파일을 import·호출하는 주요 파일을 `docs/review_input.txt`(커밋 안 함)로 묶고, 정해진 질문(버그·보안·예외 처리 누락·성능만, 심각도·파일명·줄 번호·이유·수정 제안, 불확실하면 '추정')으로 `gemini -p`에 보내 `docs/review_result.md`에 저장한다.
-   - Gemini가 없거나 로그인이 안 돼 있으면 스크립트가 실패한다 → 사장에게 설치·로그인을 부탁한다(`!` 한 줄씩: `winget install --id OpenJS.NodeJS.LTS -e` → `npm install -g @google/gemini-cli` → `gemini`로 로그인). 될 때까지 5단계는 끝나지 않는다. HANDOFF에 "현재 단계: 5 (교차 리뷰 대기)"로 적는다.
+   - Gemini가 없거나 로그인이 안 돼 있으면 스크립트가 실패한다 → 사장에게 설치·로그인을 부탁한다(`!` 한 줄씩: `winget install --id OpenJS.NodeJS.LTS -e` → `npm install -g @google/gemini-cli` → API 키: https://aistudio.google.com/apikey 에서 무료 키를 만들어 사장이 PowerShell에서 `[Environment]::SetEnvironmentVariable("GEMINI_API_KEY", "<키>", "User")` 실행. 키는 대화창에 붙여 넣지 말라고 안내. Google 계정 로그인 방식은 개인 무료 사용이 막혀 안 됨. 무료 키는 pro 모델을 못 써서 스크립트는 flash 모델을 기본으로 쓴다(`GEMINI_MODEL`로 바꿀 수 있음)). 될 때까지 5단계는 끝나지 않는다. HANDOFF에 "현재 단계: 5 (교차 리뷰 대기)"로 적는다.
    - 앱 코드가 Google 서비스로 보내진다. 안전장치가 막으면 사용자에게 `! bash .claude/skills/build-app/cross-review.sh apps/<앱> <리뷰 기준>` 실행을 부탁한다.
 3. **리뷰 결과 검토**: `review_result.md`를 읽고 각 지적이 실제로 맞는지 코드를 직접 확인해 판단한다.
    - 맞는 지적은 고친다(Claude 리뷰와 같이 회귀 테스트 먼저). 틀렸거나 불필요한 지적은 반영하지 않은 이유를 `review_result.md` 맨 아래 `## Claude 판단` 절에 지적마다 적는다.

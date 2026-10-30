@@ -35,7 +35,7 @@ junyeop3407/ai-workflow README 보고 이 컴퓨터 세팅해 줘
    → 파일 첫 줄이 `---`이고 `name: new-project`가 있는지 확인.
 6. **선택 (사용자에게 하나씩 묻기, 추천 붙여서)**:
    - 팀 기본 기술 도구(Java JDK, Node.js, Playwright 브라우저): 첫 앱을 만들 때 필요한 것만 깔아도 됨(추천: 지금은 건너뜀). 설치 명령은 HANDOFF.md "처음 쓰는 컴퓨터 준비" 6번.
-   - 교차 리뷰 도구(아래 "교차 리뷰" 절): Node.js + Gemini CLI. **교차 리뷰는 필수**라 첫 앱의 5단계 전에는 깔아야 함(추천: 지금 설치). Google 계정 로그인 필요.
+   - 교차 리뷰 도구(아래 "교차 리뷰" 절): Node.js + Gemini CLI. **교차 리뷰는 필수**라 첫 앱의 5단계 전에는 깔아야 함(추천: 지금 설치). Google AI Studio 무료 API 키 필요.
 7. **이어서 하던 프로젝트가 있으면**: 사용자에게 저장소 이름을 묻고 `"$GH" repo clone junyeop3407/<이름>` → 그 폴더에서 `HANDOFF.md 읽고 이어서 해 줘`.
 8. **알려 주기** (짧게): 된 것 / 건너뛴 것, 그리고 사용법 — 아무 폴더에서 `/new-project 만들고 싶은 것`. `/new-project`가 목록에 안 보이면 Claude Code를 한 번 껐다 켠다.
 
@@ -57,7 +57,7 @@ GH=gh; command -v gh >/dev/null || GH="/c/Program Files/GitHub CLI/gh.exe"; mkdi
 
 ## 교차 리뷰 (필수)
 5단계에서 Claude 리뷰에 더해 **Gemini CLI**에게 이번 작업의 변경분을 리뷰받습니다. 건너뛰지 않습니다(없으면 Claude가 설치를 부탁함).
-- 설치: Node.js `winget install --id OpenJS.NodeJS.LTS -e` → Gemini CLI `npm install -g @google/gemini-cli` → `gemini` 한 번 실행해 로그인
+- 설치: Node.js `winget install --id OpenJS.NodeJS.LTS -e` → Gemini CLI `npm install -g @google/gemini-cli` → https://aistudio.google.com/apikey 에서 무료 API 키를 만들고 PowerShell에서 `[Environment]::SetEnvironmentVariable("GEMINI_API_KEY", "<키>", "User")` 실행 (Google 계정 로그인 방식은 개인 무료 사용이 막혀 안 됨. 무료 키는 flash 모델만 쓸 수 있어 스크립트가 flash를 기본으로 씀)
 - 실행: `bash .claude/skills/build-app/cross-review.sh apps/<앱> <리뷰 기준 커밋>` → `apps/<앱>/docs/review_result.md`
 - 변경분 + 변경된 파일 전체 + 그 파일을 import하는 파일을 묶어 보내고, 버그·보안·예외 처리 누락·성능만 심각도와 함께 지적받습니다.
 - Claude가 각 지적이 맞는지 코드로 확인해 반영합니다. 반영 안 한 지적은 이유를 남기고, 심각도 "높음"인데 애매하면 사장에게 먼저 묻습니다. 리뷰는 1라운드만.

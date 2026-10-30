@@ -18,7 +18,9 @@ if ! command -v gemini >/dev/null 2>&1; then
 교차 리뷰는 필수인데 Gemini CLI가 없습니다. 설치하고 다시 실행하세요.
   1. Node.js:    winget install --id OpenJS.NodeJS.LTS -e   (Mac: brew install node)
   2. Gemini CLI: npm install -g @google/gemini-cli
-  3. 로그인:     gemini   (처음 한 번 실행해 Google 계정으로 로그인)
+  3. API 키:    https://aistudio.google.com/apikey 에서 무료 키를 만들고 PowerShell에서
+     [Environment]::SetEnvironmentVariable("GEMINI_API_KEY", "<키>", "User")  (터미널을 새로 열어야 적용)
+     (Google 계정 로그인 방식은 2026-10부터 개인 무료 사용이 막혀 안 됨)
 MSG
   exit 1
 fi
@@ -93,13 +95,19 @@ related=$(printf '%s\n' "$related" | sed '/^$/d' | sort -u | grep -vxF -f <(prin
 
 # 2. Gemini에게 리뷰 요청 (1라운드만)
 echo "== Gemini 리뷰 중... (몇 분 걸릴 수 있음)"
-if ! cat "$input" | gemini -p "너는 시니어 코드 리뷰어다. 아래 변경사항을 리뷰해라.
+model="${GEMINI_MODEL:-gemini-3-flash-preview}"   # 무료 키는 pro 모델 사용량이 0이라 flash를 기본으로
+# 빈 임시 폴더에서 실행: Gemini는 보낸 내용만 보고 저장소의 다른 파일은 못 본다 (그래서 --skip-trust)
+sandbox=$(mktemp -d)
+result_abs="$PWD/$result"
+if ! cat "$input" | (cd "$sandbox" && gemini --skip-trust -m "$model" -p "너는 시니어 코드 리뷰어다. 아래 변경사항을 리뷰해라.
 - 버그, 보안 문제, 예외 처리 누락, 성능 문제만 지적할 것. 스타일·네이밍 같은 취향 문제는 제외.
 - 각 항목마다 [심각도: 높음/중간/낮음], 파일명과 줄 번호, 문제 이유, 수정 제안을 적을 것.
 - 확실하지 않은 지적은 '추정'이라고 표시할 것.
-- 문제가 없으면 '문제 없음'이라고만 답할 것." > "$result"; then
-  echo "Gemini 실행 실패. 로그인이 필요할 수 있습니다: gemini 를 한 번 실행해 보세요. ($result 확인)" >&2
+- 문제가 없으면 '문제 없음'이라고만 답할 것.") > "$result_abs"; then
+  rm -rf "$sandbox"
+  echo "Gemini 실행 실패 (모델: $model). GEMINI_API_KEY가 설정됐는지, 모델 이름이 바뀌지 않았는지 확인하세요. 다른 모델: GEMINI_MODEL=<이름> bash ... ($result 확인)" >&2
   exit 1
 fi
 
+rm -rf "$sandbox"
 echo "교차 리뷰 저장: $result (보낸 내용: $input, 기준: $range)"
