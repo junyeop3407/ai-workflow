@@ -44,10 +44,10 @@ junyeop3407/ai-workflow README 보고 이 컴퓨터 세팅해 줘
 ```
 /new-project 만들고 싶은 것
 ```
-Claude가 이름을 정하고(추천해 줌), 이 견본으로 비공개 저장소를 만들어 내려받습니다.
+Claude가 이름을 정하고(추천해 줌), 이 견본으로 공개 저장소를 만들어 내려받습니다. 앱을 다 만들고 나면 공개로 둘지 비공개로 바꿀지 물어봅니다.
 그다음 만들어진 폴더를 Claude Code로 열고 `/build-app 만들고 싶은 것`.
 
-> 직접 하고 싶으면: `gh repo create <새이름> --private --template junyeop3407/ai-workflow --clone`
+> 직접 하고 싶으면: `gh repo create <새이름> --public --template junyeop3407/ai-workflow --clone`
 
 ### 다른 컴퓨터에서 `/new-project`를 쓰려면 (한 번만)
 Git Bash(또는 Mac 터미널)에서, GitHub 로그인(`gh auth login --web`) 뒤:
@@ -70,6 +70,6 @@ GH=gh; command -v gh >/dev/null || GH="/c/Program Files/GitHub CLI/gh.exe"; mkdi
 | 3단계 | QA팀 | "뭐가 되면 끝인가" 테스트 목록 승인 |
 | 4단계 시작 | 디자인팀 | 디자인 규칙과 시안 화면 캡처 검토 |
 | 4단계 시작 | 백엔드팀 | 저장할 데이터와 기능 목록 검토 (서버가 있는 앱만) |
-| 6단계 | 프론트엔드팀·QA팀 | QA 보고(테스트 결과, 리뷰에서 고친 것) 보고 완성된 앱을 써 본 뒤 OK (공개가 필요하면 `!` 한 줄 실행) |
+| 6단계 | 프론트엔드팀·QA팀 | QA 보고(테스트 결과, 리뷰에서 고친 것) 보고 완성된 앱을 써 본 뒤 OK (공개가 필요하면 `!` 한 줄 실행) → 저장소를 공개로 둘지 비공개로 바꿀지 고르기 |
 
 검토는 "OK" 또는 고칠 점을 말하면 됩니다. 고칠 점을 말하면 고쳐서 다시 검토를 요청합니다.
