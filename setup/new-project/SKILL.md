@@ -11,13 +11,13 @@ description: Use when the user wants to start a new project or app workspace ("�
 ## 순서
 1. **이름 정하기**: 사용자가 이름을 안 줬으면 하나만 묻는다. 영문 소문자와 하이픈(예: `study-timer`). 무엇을 만들지 들었으면 이름을 추천해 보기로 준다.
 2. **만들 위치**: 따로 말이 없으면 Windows는 `C:\<이름>`, Mac은 `~/<이름>`. 같은 이름 폴더나 GitHub 저장소가 이미 있으면 다른 이름을 묻는다.
-3. **만들기** (비공개):
+3. **만들기** (공개. 앱을 다 만든 뒤 `/build-app` 6단계에서 공개로 둘지 비공개로 바꿀지 다시 묻는다. 처음부터 공개이므로 API 키·비밀번호 같은 비밀값은 코드에 넣지 않고 `.env`에 둔다):
    ```
-   gh repo create <이름> --private --template junyeop3407/ai-workflow --clone
+   gh repo create <이름> --public --template junyeop3407/ai-workflow --clone
    ```
    - 만들 위치의 상위 폴더에서 실행한다. Windows에서 `gh`가 PATH에 없으면 `"C:\Program Files\GitHub CLI\gh.exe"`.
    - 저장소를 만드는 일은 바깥에 내보내는 일이라 안전장치가 막을 수 있다. 막히면 사용자에게 짧은 한 줄을 준다:
-     `! cd /c && "/c/Program Files/GitHub CLI/gh.exe" repo create <이름> --private --template junyeop3407/ai-workflow --clone`
+     `! cd /c && "/c/Program Files/GitHub CLI/gh.exe" repo create <이름> --public --template junyeop3407/ai-workflow --clone`
      (`!`는 맨 앞, 띄어쓰기 없이)
    - `gh`가 없거나 로그인이 안 돼 있으면: `winget install GitHub.cli` → `! gh auth login --web` → `gh auth setup-git`.
 4. **확인**: 새 폴더에 `CLAUDE.md`, `.claude/skills/build-app/SKILL.md`가 있는지 본다. 견본에서 막 만든 저장소는 내용이 늦게 채워질 수 있으니, 비어 있으면 몇 초 뒤 `git pull`.
