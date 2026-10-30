@@ -9,7 +9,7 @@ Claude Code가 혼자 돌려서 앱을 만드는 작업장 견본입니다.
 
 ## 들어 있는 것
 - `CLAUDE.md`: Claude가 항상 지키는 규칙
-- `/build-app` 스킬: 질문 → 설계안 3개 → 테스트 목록 승인 → 구현 → 별도 리뷰 + **교차 리뷰**(다른 회사 AI) → 확인·올리기
+- `/build-app` 스킬: 질문 → 설계안 3개 → 테스트 목록 승인 → 구현 → 별도 리뷰 + **교차 리뷰**(Gemini, 필수) → 확인·올리기
 - 훅: 테스트가 실패하면 커밋과 "다 됐다" 보고를 막음
 - `HANDOFF.md`: 어느 컴퓨터에서든 여기서 이어서 시작
 - `setup/new-project/`: 어디서든 "새 프로젝트 만들어 줘"로 이 견본을 꺼내 쓰는 개인 스킬
@@ -35,7 +35,7 @@ junyeop3407/ai-workflow README 보고 이 컴퓨터 세팅해 줘
    → 파일 첫 줄이 `---`이고 `name: new-project`가 있는지 확인.
 6. **선택 (사용자에게 하나씩 묻기, 추천 붙여서)**:
    - 팀 기본 기술 도구(Java JDK, Node.js, Playwright 브라우저): 첫 앱을 만들 때 필요한 것만 깔아도 됨(추천: 지금은 건너뜀). 설치 명령은 HANDOFF.md "처음 쓰는 컴퓨터 준비" 6번.
-   - 교차 리뷰 도구(아래 "교차 리뷰" 절): Node.js + Codex CLI 또는 Gemini CLI. 각 회사 계정 로그인이 필요함.
+   - 교차 리뷰 도구(아래 "교차 리뷰" 절): Node.js + Gemini CLI. **교차 리뷰는 필수**라 첫 앱의 5단계 전에는 깔아야 함(추천: 지금 설치). Google 계정 로그인 필요.
 7. **이어서 하던 프로젝트가 있으면**: 사용자에게 저장소 이름을 묻고 `"$GH" repo clone junyeop3407/<이름>` → 그 폴더에서 `HANDOFF.md 읽고 이어서 해 줘`.
 8. **알려 주기** (짧게): 된 것 / 건너뛴 것, 그리고 사용법 — 아무 폴더에서 `/new-project 만들고 싶은 것`. `/new-project`가 목록에 안 보이면 Claude Code를 한 번 껐다 켠다.
 
@@ -55,12 +55,13 @@ Git Bash(또는 Mac 터미널)에서, GitHub 로그인(`gh auth login --web`) �
 GH=gh; command -v gh >/dev/null || GH="/c/Program Files/GitHub CLI/gh.exe"; mkdir -p ~/.claude/skills/new-project && "$GH" api repos/junyeop3407/ai-workflow/contents/setup/new-project/SKILL.md -H "Accept: application/vnd.github.raw" > ~/.claude/skills/new-project/SKILL.md
 ```
 
-## 교차 리뷰 (선택)
-5단계에서 Claude 리뷰에 더해 다른 회사 AI에게도 리뷰를 맡깁니다. 깔려 있는 것만 씁니다. 없으면 건너뜁니다.
-- Node.js: `winget install --id OpenJS.NodeJS.LTS -e`
-- Codex CLI: `npm install -g @openai/codex` → `codex` 한 번 실행해 로그인
-- Gemini CLI: `npm install -g @google/gemini-cli` → `gemini` 한 번 실행해 로그인
-- 실행: `bash .claude/skills/build-app/cross-review.sh apps/<앱>` → `apps/<앱>/docs/cross-review.md`
+## 교차 리뷰 (필수)
+5단계에서 Claude 리뷰에 더해 **Gemini CLI**에게 이번 작업의 변경분을 리뷰받습니다. 건너뛰지 않습니다(없으면 Claude가 설치를 부탁함).
+- 설치: Node.js `winget install --id OpenJS.NodeJS.LTS -e` → Gemini CLI `npm install -g @google/gemini-cli` → `gemini` 한 번 실행해 로그인
+- 실행: `bash .claude/skills/build-app/cross-review.sh apps/<앱> <리뷰 기준 커밋>` → `apps/<앱>/docs/review_result.md`
+- 변경분 + 변경된 파일 전체 + 그 파일을 import하는 파일을 묶어 보내고, 버그·보안·예외 처리 누락·성능만 심각도와 함께 지적받습니다.
+- Claude가 각 지적이 맞는지 코드로 확인해 반영합니다. 반영 안 한 지적은 이유를 남기고, 심각도 "높음"인데 애매하면 사장에게 먼저 묻습니다. 리뷰는 1라운드만.
+- 6단계 QA 보고에 "반영한 지적 / 반영 안 한 지적(이유) / 확인 필요한 것"으로 정리됩니다.
 
 ## 사장이 하는 일 (모든 팀의 결과물을 검토)
 | 언제 | 팀 | 할 일 |

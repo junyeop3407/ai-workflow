@@ -23,3 +23,6 @@ coverage/
 Thumbs.db
 .vscode/
 .idea/
+
+# 교차 리뷰에 보낸 내용 (다시 만들 수 있음)
+review_input.txt

@@ -27,7 +27,7 @@
 |---|---|---|
 | 0~3 | 폴더 구조, 규칙(CLAUDE.md), `/build-app` 스킬, 훅 | ✅ 준비됨 |
 | 4 | 첫 앱 만들기 (`apps/<앱이름>/`) | ⬜ 다음 |
-| 교차 리뷰 | 5단계에 다른 회사 AI(Codex·Gemini CLI) 리뷰 추가 (도구는 선택 설치, README 참고) | ✅ 준비됨 |
+| 교차 리뷰 | 5단계에 Gemini CLI 리뷰 (**필수**, 변경분 1라운드, README 참고) | ✅ 준비됨 |
 
 ## 5. 파일 구조
 ```
@@ -36,7 +36,7 @@
 ├── README.md                              이 견본을 새 프로젝트에 쓰는 방법
 ├── .claude/skills/build-app/SKILL.md      /build-app 절차 (앱 하나 한 바퀴, 기능 추가도 같은 순서)
 ├── .claude/skills/build-app/templates/    견본 파일 (파이썬으로 테스트하는 앱용 run.sh)
-├── .claude/skills/build-app/cross-review.sh  교차 리뷰 (Codex·Gemini CLI가 있으면 사용)
+├── .claude/skills/build-app/cross-review.sh  교차 리뷰 (필수, Gemini CLI로 변경분 리뷰)
 ├── setup/new-project/SKILL.md             "새 프로젝트 만들어 줘" 개인 스킬 (README 참고해 설치)
 ├── .claude/hooks/check-tests.sh           테스트 실패 시 커밋·완료 보고 막기
 ├── .claude/settings.json                  훅 등록, superpowers 플러그인 켜기
