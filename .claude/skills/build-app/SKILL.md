@@ -24,7 +24,7 @@ description: Use when the user asks to build a new app or program in this reposi
 | 3 ★ | **QA팀**: "뭐가 되면 끝인가" 테스트 목록을 쉬운 말로 → **사장 검토(승인)**. 승인 후 테스트 코드 작성(승인 목록은 Playwright, 까다로운 계산·날짜는 부품 단위 테스트 추가) | `docs/tests.md`, `tests/` | superpowers:test-driven-development |
 | 4 ★ | 계획(작은 앱이어도 단계 3~6줄) → (화면이 있으면) **디자인팀** `docs/DESIGN.md` + 시안 캡처 → **사장 검토** → (서버가 있으면) **백엔드팀** 저장할 데이터·기능 목록(쉬운 말로) → **사장 검토** → 구현 → 테스트 → 실패한 것만 고치기, 전부 통과까지 | `docs/plan.md`, `docs/NOTES.md` | superpowers:writing-plans, superpowers:subagent-driven-development |
 | 5 | **QA팀**: ① 새 에이전트(Agent 도구, 구현 대화를 넘기지 않음)에게 `docs/tests.md`와 코드·테스트 파일 경로만 주고 리뷰 ② **교차 리뷰**: `bash .claude/skills/build-app/cross-review.sh apps/<앱>` (다른 회사 AI) → 둘에서 나온 진짜 문제만 고치고 테스트 다시 실행 | `docs/review.md`, `docs/cross-review.md` | superpowers:requesting-code-review |
-| 6 ★ | 테스트를 직접 돌려 통과 확인 → (공개가 필요하면 아래 "올리기") → **QA 보고**(테스트 N/N 통과, 리뷰에서 찾고 고친 것) + 실행 방법 한두 줄 → **사장 검토**: 써 보고 OK | `HANDOFF.md`, 루트 `HANDOFF.md` | superpowers:verification-before-completion |
+| 6 ★ | 테스트를 직접 돌려 통과 확인 → (공개가 필요하면 아래 "올리기") → **QA 보고**(테스트 N/N 통과, 리뷰에서 찾고 고친 것) + 실행 방법 한두 줄 → **사장 검토**: 써 보고 OK → **저장소 공개 여부 묻기**(아래 "저장소 공개 여부") | `HANDOFF.md`, 루트 `HANDOFF.md` | superpowers:verification-before-completion |
 
 ★ 단계에서는 사장의 OK를 받기 전에 그 결과물을 바탕으로 다음 일을 시작하지 않는다. 수정 지시를 받으면 고쳐서 다시 검토받는다. 코드는 3단계 승인 뒤에만 쓴다.
 
@@ -78,6 +78,12 @@ description: Use when the user asks to build a new app or program in this reposi
   - 다시 올리기: `apps/<앱>/deploy.sh`(상대 경로만, 임시 폴더에 공개 저장소를 받아 앱 파일만 덮어쓰고 푸시, 커밋 이름·이메일은 이 저장소 설정에서 가져옴). 사용자에게 `! bash apps/<앱>/deploy.sh`를 부탁한다.
 - 올린 뒤 **공개 주소를 직접 열어** 새 버전이 반영됐는지, 핵심 기능이 되는지 확인하고 나서 링크를 준다. 주소와 다시 올리는 방법을 `apps/<앱>/HANDOFF.md`에 적는다.
 - `!` 명령은 맨 앞에 띄어쓰기가 있으면 실행되지 않고 메시지로만 간다. 처음 부탁할 때 알려 준다.
+
+## 저장소 공개 여부 (6단계 사장 OK 뒤)
+- 새 프로젝트 저장소는 공개로 만들어져 있다. 앱을 다 만들고 사장 OK를 받으면 "이 저장소를 공개로 둘까요, 비공개로 바꿀까요?"를 보기 + 추천과 함께 묻는다(포트폴리오로 보여 줄 앱이면 공개 추천).
+- 묻기 전에 코드와 커밋 기록에 비밀값(API 키, 토큰, 비밀번호, 개인정보)이 없는지 확인하고 결과를 함께 알린다.
+- 비공개로 바꾸기: 그 폴더에서 `gh repo edit --visibility private --accept-visibility-change-consequences`. 안전장치가 막으면 사용자에게 `!` 한 줄로 부탁한다.
+- 고른 결과를 `HANDOFF.md`에 적는다.
 
 ## 흔한 실수
 | 핑계 | 실제 |
