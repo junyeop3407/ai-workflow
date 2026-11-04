@@ -14,13 +14,16 @@ app="$(printf '%s' "$file" | sed -n 's#^\(.*/\)\{0,1\}apps/\([^/]*\)/.*$#\2#p')"
 [ -z "$app" ] && exit 0
 rel="$(printf '%s' "$file" | sed -n 's#^\(.*/\)\{0,1\}\(apps/[^/]*/.*\)$#\2#p')"
 
-# 테스트·문서·기록은 무시
+# 테스트·문서·기록·화면 꾸밈 파일은 무시
 case "$rel" in
   */tests/*|*/test/*|*/docs/*|*.md|*/.redteam-needed) exit 0 ;;
+  *.css|*.scss|*.sass|*.less|*.svg|*.png|*.jpg|*.jpeg|*.gif|*.webp|*.ico|*.woff|*.woff2|*.ttf|*.lock) exit 0 ;;
 esac
 
-# 보안에 민감한 파일 이름·경로인지 (대소문자 무시)
-printf '%s' "$rel" | grep -Eiq '(auth|login|logout|signin|signup|session|token|jwt|password|passwd|oauth|security|payment|pay|checkout|order|price|coupon|point|wallet|refund|billing|member|user|account|profile|admin|role|permission|upload|webhook|fetch|proxy|filter|interceptor|config)' || exit 0
+# 보안에 민감한 파일인지: 경로 조각(폴더·파일 이름)이 아래 단어로 "시작"할 때만 (대소문자 무시)
+# 예) AuthController.java, jwt/, PaymentService.java, admin/ → 해당 / border.css, endpoint.ts, UserCard.tsx → 아님
+low="$(printf '%s' "$rel" | tr 'A-Z' 'a-z')"
+printf '%s' "$low" | grep -Eq '(^|[/._-])(auth|login|logout|signin|signup|session|token|jwt|password|passwd|oauth|security|payment|pay[/._-]|checkout|order|price|coupon|point|wallet|refund|billing|member|account|admin|role|permission|upload|webhook|user(s)?(service|controller|repository|repo|api|route|handler|[/._-]))' || exit 0
 
 root="$(git rev-parse --show-toplevel 2>/dev/null)" || exit 0
 flag="$root/apps/$app/.redteam-needed"
