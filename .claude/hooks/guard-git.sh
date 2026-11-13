@@ -43,21 +43,24 @@ root="$(git rev-parse --show-toplevel 2>/dev/null)" || exit 0
 cd "$root" || exit 0
 
 # 커밋될 파일 목록: 스테이지된 것 + (같은 명령에 git add / commit -a 가 있으면) 아직 안 올린 변경까지
-files="$(git diff --cached --name-only --diff-filter=ACMR)"
-diffs="$(git diff --cached --diff-filter=ACMR -U0)"
+# 한글 등 비ASCII 경로를 git이 "\354\243..." 처럼 따옴표로 감싸 출력하면 아래 패턴 검사를 빠져나가므로 끈다.
+g() { git -c core.quotePath=false "$@"; }
+files="$(g diff --cached --name-only --diff-filter=ACMR)"
+diffs="$(g diff --cached --diff-filter=ACMR -U0)"
 if printf '%s' "$cmd" | grep -Eq 'git[[:space:]]+add\b|commit[^;&|]*[[:space:]]-[a-zA-Z]*a'; then
   files="$files
-$(git diff --name-only --diff-filter=ACMR)
-$(git ls-files --others --exclude-standard)"
+$(g diff --name-only --diff-filter=ACMR)
+$(g ls-files --others --exclude-standard)"
   diffs="$diffs
-$(git diff --diff-filter=ACMR -U0)"
+$(g diff --diff-filter=ACMR -U0)"
   while IFS= read -r f; do
     [ -f "$f" ] && diffs="$diffs
 +++ b/$f
 $(sed 's/^/+/' "$f" 2>/dev/null)"
-  done <<< "$(git ls-files --others --exclude-standard)"
+  done <<< "$(g ls-files --others --exclude-standard)"
 fi
-files="$(printf '%s\n' "$files" | sed '/^$/d' | sort -u)"
+# 따옴표·줄바꿈 같은 특수문자가 든 경로는 그래도 따옴표로 감싸지므로 앞뒤 따옴표를 벗긴다.
+files="$(printf '%s\n' "$files" | sed '/^$/d; s/^"//; s/"$//' | sort -u)"
 
 # 2-1. 올리면 안 되는 파일
 bad_files="$(printf '%s\n' "$files" | grep -E '(^|/)\.env($|\.)|\.(pem|key|p12|jks|keystore)$|(^|/)(node_modules|dist|build|\.venv|venv|__pycache__)/' | grep -Ev '(^|/)\.env\.example$')"
