@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # CLAUDE.md "절대 하지 않을 것"을 부탁이 아니라 시스템으로 막는다. (PreToolUse: Bash|PowerShell)
 #   1. 강제 푸시, 커밋 기록 고쳐 쓰기, 저장소 삭제 → 항상 막음 (꼭 필요하면 사장이 직접 `!`로 실행)
-#   2. git commit 직전: 커밋될 파일에 .env·키 파일·node_modules·빌드 결과물, 비밀값 패턴,
+#   2. git commit 직전: 커밋될 파일에 .env·키 파일·node_modules·빌드 결과물,
+#      실제 업무 데이터 파일(엑셀·CSV 등, tests/fixtures/ 밖)·samples/ 폴더, 비밀값 패턴,
 #      특정 컴퓨터 전용 경로(C:\Users\..., /Users/<이름>/, /home/<이름>/)가 있으면 막음
 # jq 없이 동작한다 (Windows Git Bash에는 jq가 없는 경우가 많다).
 # 종료 코드 2 = 막기 (stderr 내용이 Claude에게 전달된다), 0 = 통과.
@@ -63,6 +64,14 @@ bad_files="$(printf '%s\n' "$files" | grep -E '(^|/)\.env($|\.)|\.(pem|key|p12|j
 [ -n "$bad_files" ] && block "커밋하면 안 되는 파일이 있습니다(.env·키 파일·다시 만들 수 있는 폴더):
 $bad_files
 → git restore --staged <파일> 로 빼고, 필요하면 .gitignore에 추가하세요. 값은 .env.example에 이름만."
+
+# 2-1b. 실제 업무 데이터 파일 (주문서·고객 명단·원가표 등이 담길 수 있음)
+#   테스트용 가짜 견본(tests/fixtures/ 아래)만 허용한다. samples/ 폴더는 통째로 막는다.
+data_files="$(printf '%s\n' "$files" | grep -Ei '\.(xlsx|xlsm|xls|csv|tsv|hwp|hwpx|numbers)$|(^|/)samples/' | grep -Ev '(^|/)tests/fixtures/')"
+[ -n "$data_files" ] && block "실제 업무 데이터일 수 있는 파일이 커밋에 들어 있습니다:
+$data_files
+→ git restore --staged <파일> 로 빼세요. 실제 파일은 apps/<앱>/samples/(커밋 안 함)에 두고,
+  테스트에는 칸·형식은 같고 내용은 가짜인 견본을 만들어 tests/fixtures/ 에 두세요. (/build-app '견본 파일' 절)"
 
 # 2-2. 비밀값 패턴과 컴퓨터 전용 경로 (추가된 줄만, 훅 파일 자신은 제외)
 added="$(printf '%s\n' "$diffs" | awk '

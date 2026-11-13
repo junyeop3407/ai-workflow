@@ -5,6 +5,9 @@
 *.pem
 *.key
 
+# 사장이 준 실제 업무 파일 (주문서·고객 명단·원가표 등). 테스트에는 tests/fixtures/의 가짜 견본만
+samples/
+
 # 다시 만들 수 있는 것
 node_modules/
 dist/
