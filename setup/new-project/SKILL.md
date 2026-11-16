@@ -24,7 +24,7 @@ description: Use when the user wants to start a new project or app workspace ("�
 5. git 이름·이메일이 없으면 새 폴더에 `git config user.name`, `git config user.email`을 설정한다(지금 컴퓨터의 다른 저장소 값을 그대로).
 6. **알려 주기** (짧게):
    - 만든 저장소 주소와 폴더 위치
-   - 다음: 그 폴더를 Claude Code로 연다(인텔리제이에서 폴더 열기 → Claude Code, 또는 터미널에서 그 폴더로 가서 `claude`). 처음 열면 superpowers 플러그인 설치를 묻는다 → "예".
+   - 다음: 그 폴더를 Claude Code로 연다(인텔리제이에서 폴더 열기 → Claude Code, 또는 터미널에서 그 폴더로 가서 `claude`). 처음 열면 superpowers·modern-web-guidance 플러그인 설치를 묻는다 → 둘 다 "예".
    - 첫 마디: `/build-app 만들고 싶은 것`
 
 ## 참고

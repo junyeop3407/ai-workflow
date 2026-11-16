@@ -1,6 +1,6 @@
 # HANDOFF — 다음 세션 시작 가이드
 
-마지막 갱신: 2026-11-13
+마지막 갱신: 2026-11-16
 
 ## 1. 한 줄 요약
 이석균 선배님 특강(AI 기초)의 방식대로 앱을 만드는 **작업장 견본**이다. 사용자는 **사장**, Claude의 팀들(기획·디자인·프론트엔드·백엔드·QA)은 **직원**이고, 모든 팀의 결과물은 사장 검토를 받는다. 규칙, `/build-app` 스킬, 교차 리뷰, 훅이 준비되어 있고 아직 만든 앱은 없다. 다음은 첫 앱 만들기.
@@ -14,7 +14,7 @@
 1. git 설치 (Windows는 Git Bash가 함께 깔림. 훅이 bash로 돈다)
 2. GitHub CLI: `winget install GitHub.cli` → `gh auth login --web` → `gh auth setup-git`
 3. 저장소 받기: `git clone <이 저장소 주소>`
-4. 이 폴더를 Claude Code로 처음 열면 superpowers 플러그인 설치를 묻는다 → "예"
+4. 이 폴더를 Claude Code로 처음 열면 superpowers·modern-web-guidance 플러그인 설치를 묻는다 → 둘 다 "예"
 5. git 이름·이메일이 없으면: `git config user.name "이름"`, `git config user.email "메일"`
 6. 팀 기본 기술 도구 (첫 앱을 만들 때 Claude가 필요한 것만 설치를 안내한다):
    - Java (백엔드팀): `winget install --id EclipseAdoptium.Temurin.21.JDK -e` (Mac `brew install --cask temurin@21`)
@@ -31,6 +31,7 @@
 | 구조 정리 | CLAUDE.md를 rules·skills·hooks·agents로 나눔 (130 → 93줄) | ✅ 2026-11-01 |
 | 견본 파일 | 변환 전/후 실제 파일 → 요구사항·테스트 정답 (`/build-app` "견본 파일"), 실제 데이터 파일 커밋 차단(guard-git, `samples/`) | ✅ 2026-11-13 |
 | 고르기 돕기 | 2단계 설계안 점수표(가중치 4기준·추천), 참고 디자인 분석(유지할 것 / 바꿀 것 / 베끼지 말 것 → DESIGN.md "참고") | ✅ 2026-11-13 |
+| 최신 웹 표준 | Chrome 팀 modern-web-guidance 플러그인 자동 설치·자동 사용(화면 코드 전 가이드 검색, iOS Safari Baseline 기준, 이어 하는 앱 현대화 점검) | ✅ 2026-11-16 |
 
 ## 5. 파일 구조
 ```
@@ -53,7 +54,7 @@
 ├── .claude/hooks/check-tests.sh           테스트 실패 시 커밋·완료 보고 막기
 ├── .claude/hooks/guard-git.sh             강제 푸시·기록 수정·저장소 삭제 차단, 커밋 전 비밀값·.env·절대경로 검사
 ├── .claude/hooks/protect-tests.sh         커밋된(승인된) 테스트 수정 시 사장 확인 창
-├── .claude/settings.json                  훅 등록, superpowers 플러그인 켜기
+├── .claude/settings.json                  훅 등록, superpowers·modern-web-guidance 플러그인 켜기
 └── apps/                                  앱 하나당 폴더 하나 (아직 비어 있음)
 ```
 
