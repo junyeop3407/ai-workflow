@@ -70,6 +70,8 @@ description: Use when the user asks to build a new app or program in this reposi
 | 4단계 디자인팀 시안·DESIGN.md | hallmark, frontend-design | AI 티 안 나는 화면 방향과 구성 |
 | 4단계 화면 다듬기 | emil-design-eng | 버튼·애니메이션 같은 작은 디테일 |
 | 모든 코드 작성·수정 (4단계) | ponytail | 필요한 만큼만 짓되 검증·보안·예외 처리는 빼지 않음 |
+| 화면 코드 작성·수정 전 (4단계, 매번) | modern-web-guidance | 그 작업의 최신 웹 표준 가이드를 먼저 찾아 브라우저 기본 기능으로 짬. iOS Safari 호환(Baseline Widely available) 기준. 자세한 건 `.claude/rules/web-and-mobile.md` |
+| 이어 하는 앱, 4단계 시작 전 | modern-web-guidance (점검) | 옛날 방식 웹 코드를 찾아 바꿀 목록을 `docs/plan.md`에 |
 | 화면 완성 후, 6단계 전 | web-design-guidelines | 접근성·UI 가이드라인 점검 |
 | 화면 완성 후, 6단계 전 | break-ui | 긴 이름·빈 목록·큰 숫자 같은 최악의 데이터로 깨지는지 확인 |
 | QA팀 브라우저 테스트 | webapp-testing | Playwright로 로컬 앱을 실제로 조작하고 캡처 |

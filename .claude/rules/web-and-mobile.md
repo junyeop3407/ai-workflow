@@ -17,6 +17,13 @@ paths:
 - 화면은 폰 크기(안드로이드·아이폰 둘 다)에서 깨지지 않게 만들고, 아이폰 노치·하단 바 영역(safe area)을 고려한다.
 - 안드로이드 빌드는 Android Studio, iOS 빌드는 Mac + Xcode가 필요하다. Mac이 없는 컴퓨터에서는 iOS 빌드를 건너뛰고 "iOS는 Mac에서 빌드 필요"라고 사장에게 알린다(웹·안드로이드는 그대로 진행).
 
+## 최신 웹 표준으로 (modern-web-guidance, 사장이 말하지 않아도 항상)
+- 화면 코드(HTML·CSS·JS/TS·React)를 **새로 짜거나 고치기 전에** `modern-web-guidance` 스킬로 그 작업의 가이드를 먼저 찾아 읽고 따른다. 예: 모달 → "accessible modal dialog", 드롭다운 → "popover menu". div + 자바스크립트로 흉내 내지 말고 브라우저 기본 기능(`<dialog>`, popover, `:has()`, 컨테이너 쿼리 등)을 쓴다.
+- 스킬이 없으면 직접 `npx -y modern-web-guidance@latest search "<하고 싶은 것>"` → `retrieve <ID>`로 찾는다. 둘 다 안 되면 "필요한 것이 없을 때"(CLAUDE.md)대로 멈추고 알린다.
+- **iOS가 기준이다.** 앱은 iOS Safari(WKWebView)에서도 열려야 하므로 가이드가 권하는 기능이라도 **Baseline "Widely available"**인 것만 그냥 쓴다. "Newly available"이나 Safari 미지원 기능은 대체 방법(폴백)을 함께 만든다.
+- 가이드는 화면(프론트) 코드에만 쓴다. 백엔드(Java + Spring)에는 해당 없음.
+- 이미 만든 앱을 이어 할 때는 4단계 시작 전에 한 번 "이 앱에서 옛날 방식으로 짠 웹 코드 찾아서 요즘 방식으로 바꿀 수 있는 것" 점검을 돌리고, 바꿀 목록을 `docs/plan.md`에 넣는다. 점검이 모든 패턴을 잡지는 못하니 결과는 직접 확인한다.
+
 ## 디자인 규칙대로
 - 디자인팀이 먼저 쓴 `apps/<앱>/docs/DESIGN.md`(색·글꼴·간격·컴포넌트)를 따른다. 규칙에 없는 색·간격을 새로 만들지 않는다. Tailwind CSS 사용.
 - 완성 전 폰·PC 크기 화면을 캡처해 DESIGN.md대로인지 확인한다.
