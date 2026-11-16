@@ -1,7 +1,9 @@
 {
   "enabledPlugins": {
     "superpowers@claude-plugins-official": true,
-    "modern-web-guidance@claude-plugins-official": true
+    "modern-web-guidance@claude-plugins-official": true,
+    "context7@claude-plugins-official": true,
+    "chrome-devtools-mcp@claude-plugins-official": true
   },
   "hooks": {
     "PreToolUse": [
