@@ -14,7 +14,7 @@
 1. git 설치 (Windows는 Git Bash가 함께 깔림. 훅이 bash로 돈다)
 2. GitHub CLI: `winget install GitHub.cli` → `gh auth login --web` → `gh auth setup-git`
 3. 저장소 받기: `git clone <이 저장소 주소>`
-4. 이 폴더를 Claude Code로 처음 열면 superpowers·modern-web-guidance 플러그인 설치를 묻는다 → 둘 다 "예"
+4. 이 폴더를 Claude Code로 처음 열면 superpowers·modern-web-guidance·context7·chrome-devtools-mcp 플러그인 설치를 묻는다 → 모두 "예" (chrome-devtools는 Chrome 브라우저가 깔려 있어야 함)
 5. git 이름·이메일이 없으면: `git config user.name "이름"`, `git config user.email "메일"`
 6. 팀 기본 기술 도구 (첫 앱을 만들 때 Claude가 필요한 것만 설치를 안내한다):
    - Java (백엔드팀): `winget install --id EclipseAdoptium.Temurin.21.JDK -e` (Mac `brew install --cask temurin@21`)
@@ -32,6 +32,7 @@
 | 견본 파일 | 변환 전/후 실제 파일 → 요구사항·테스트 정답 (`/build-app` "견본 파일"), 실제 데이터 파일 커밋 차단(guard-git, `samples/`) | ✅ 2026-11-13 |
 | 고르기 돕기 | 2단계 설계안 점수표(가중치 4기준·추천), 참고 디자인 분석(유지할 것 / 바꿀 것 / 베끼지 말 것 → DESIGN.md "참고") | ✅ 2026-11-13 |
 | 최신 웹 표준 | Chrome 팀 modern-web-guidance 플러그인 자동 설치·자동 사용(화면 코드 전 가이드 검색, iOS Safari Baseline 기준, 이어 하는 앱 현대화 점검) | ✅ 2026-11-16 |
+| MCP 2개 | context7(라이브러리 버전별 최신 문서, 코드 작성 전 자동), chrome-devtools-mcp(6단계 콘솔·네트워크·성능 점검) 플러그인 자동 설치·자동 사용. playwright·github·filesystem MCP는 기존 기능(Playwright 테스트·webapp-testing, gh CLI, 기본 파일 도구)과 겹쳐서 넣지 않음 | ✅ 2026-11-16 |
 
 ## 5. 파일 구조
 ```
@@ -54,7 +55,7 @@
 ├── .claude/hooks/check-tests.sh           테스트 실패 시 커밋·완료 보고 막기
 ├── .claude/hooks/guard-git.sh             강제 푸시·기록 수정·저장소 삭제 차단, 커밋 전 비밀값·.env·절대경로 검사
 ├── .claude/hooks/protect-tests.sh         커밋된(승인된) 테스트 수정 시 사장 확인 창
-├── .claude/settings.json                  훅 등록, superpowers·modern-web-guidance 플러그인 켜기
+├── .claude/settings.json                  훅 등록, 플러그인 켜기(superpowers·modern-web-guidance·context7·chrome-devtools-mcp)
 └── apps/                                  앱 하나당 폴더 하나 (아직 비어 있음)
 ```
 

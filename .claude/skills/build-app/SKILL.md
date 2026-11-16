@@ -24,7 +24,7 @@ description: Use when the user asks to build a new app or program in this reposi
 | 3 ★ | **QA팀**: "뭐가 되면 끝인가" 테스트 목록을 쉬운 말로(견본 파일이 있으면 "견본 N쌍을 넣으면 정답 파일과 똑같이 나온다"를 맨 위에) → **사장 검토(승인)**. 승인 후 테스트 코드 작성(승인 목록은 Playwright, 까다로운 계산·날짜는 부품 단위 테스트 추가) | `docs/tests.md`, `tests/` | superpowers:test-driven-development |
 | 4 ★ | **계획 모드로 계획**(아래 "계획 모드" 절, 작은 앱이어도 단계 3~6줄) → (화면이 있으면) **디자인팀** `docs/DESIGN.md` + 시안 캡처 → **사장 검토** → (서버가 있으면) **백엔드팀** 저장할 데이터·기능 목록(쉬운 말로) → **사장 검토** → 구현 → 테스트 → 실패한 것만 고치기, 전부 통과까지 | `docs/plan.md`, `docs/NOTES.md` | superpowers:writing-plans, superpowers:subagent-driven-development |
 | 5 | **QA팀**: ① `qa-reviewer` 에이전트(구현 대화를 넘기지 않음)에게 앱 폴더 경로와 `docs/tests.md`만 주고 리뷰 ② **교차 리뷰(필수, Gemini)**: 아래 "교차 리뷰" 절 순서대로 → 둘에서 나온 진짜 문제만 고치고 테스트 다시 실행 | `docs/review.md`, `docs/review_result.md` | superpowers:requesting-code-review |
-| 6 ★ | `test-runner`로 테스트를 돌려 통과 확인 → **레드팀 공격**(아래 "레드팀 공격" 절) → (공개가 필요하면 아래 "올리기") → **QA 보고**(테스트 N/N 통과, 리뷰에서 찾고 고친 것, 교차 리뷰 "반영한 지적 / 반영 안 한 지적(이유) / 사장 확인 필요한 것", 보안 "배포 전 체크리스트" 12개 ✓/✗ + 레드팀에서 찾은 구멍 N개 → 고침) + 실행 방법 한두 줄 → **사장 검토**: 써 보고 OK → **저장소 공개 여부 묻기**(아래 "저장소 공개 여부") | `HANDOFF.md`, 루트 `HANDOFF.md` | superpowers:verification-before-completion |
+| 6 ★ | `test-runner`로 테스트를 돌려 통과 확인 → (화면이 있으면) **DevTools 점검**(chrome-devtools-mcp, 아래 스킬 사용 표) → **레드팀 공격**(아래 "레드팀 공격" 절) → (공개가 필요하면 아래 "올리기") → **QA 보고**(테스트 N/N 통과, 리뷰에서 찾고 고친 것, 교차 리뷰 "반영한 지적 / 반영 안 한 지적(이유) / 사장 확인 필요한 것", 보안 "배포 전 체크리스트" 12개 ✓/✗ + 레드팀에서 찾은 구멍 N개 → 고침, 화면이 있으면 DevTools 점검 콘솔 에러·실패 요청·LCP) + 실행 방법 한두 줄 → **사장 검토**: 써 보고 OK → **저장소 공개 여부 묻기**(아래 "저장소 공개 여부") | `HANDOFF.md`, 루트 `HANDOFF.md` | superpowers:verification-before-completion |
 
 ★ 단계에서는 사장의 OK를 받기 전에 그 결과물을 바탕으로 다음 일을 시작하지 않는다. 수정 지시를 받으면 고쳐서 다시 검토받는다. 코드는 3단계 승인 뒤에만 쓴다.
 
@@ -72,6 +72,8 @@ description: Use when the user asks to build a new app or program in this reposi
 | 모든 코드 작성·수정 (4단계) | ponytail | 필요한 만큼만 짓되 검증·보안·예외 처리는 빼지 않음 |
 | 화면 코드 작성·수정 전 (4단계, 매번) | modern-web-guidance | 그 작업의 최신 웹 표준 가이드를 먼저 찾아 브라우저 기본 기능으로 짬. iOS Safari 호환(Baseline Widely available) 기준. 자세한 건 `.claude/rules/web-and-mobile.md` |
 | 이어 하는 앱, 4단계 시작 전 | modern-web-guidance (점검) | 옛날 방식 웹 코드를 찾아 바꿀 목록을 `docs/plan.md`에 |
+| 라이브러리를 쓰는 코드 작성·수정 전, 설치·버전 올릴 때 (2·4단계, 매번) | context7 (MCP) | React·Capacitor·Tailwind·Vite·Spring·Playwright 등 **그 앱에 깔린 버전**의 공식 문서를 먼저 찾아 보고 짠다. 기억에 의존해 API를 쓰지 않는다. 브라우저 기본 기능은 modern-web-guidance, 라이브러리는 context7 |
+| 화면이 있는 앱, 6단계 레드팀 전 | chrome-devtools-mcp (MCP + 스킬) | 로컬에서 띄운 앱을 열어 ① 콘솔 에러·경고 0개 ② 실패한 네트워크 요청 0개 ③ 성능 기록(LCP 등)과 접근성 점검 ④ 폰 크기 화면 확인. 찾은 문제는 고치고 QA 보고에 "DevTools 점검" 줄로 넣는다. **localhost만** 연다 |
 | 화면 완성 후, 6단계 전 | web-design-guidelines | 접근성·UI 가이드라인 점검 |
 | 화면 완성 후, 6단계 전 | break-ui | 긴 이름·빈 목록·큰 숫자 같은 최악의 데이터로 깨지는지 확인 |
 | QA팀 브라우저 테스트 | webapp-testing | Playwright로 로컬 앱을 실제로 조작하고 캡처 |

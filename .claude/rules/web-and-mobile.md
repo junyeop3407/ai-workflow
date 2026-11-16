@@ -22,6 +22,8 @@ paths:
 - 스킬이 없으면 직접 `npx -y modern-web-guidance@latest search "<하고 싶은 것>"` → `retrieve <ID>`로 찾는다. 둘 다 안 되면 "필요한 것이 없을 때"(CLAUDE.md)대로 멈추고 알린다.
 - **iOS가 기준이다.** 앱은 iOS Safari(WKWebView)에서도 열려야 하므로 가이드가 권하는 기능이라도 **Baseline "Widely available"**인 것만 그냥 쓴다. "Newly available"이나 Safari 미지원 기능은 대체 방법(폴백)을 함께 만든다.
 - 가이드는 화면(프론트) 코드에만 쓴다. 백엔드(Java + Spring)에는 해당 없음.
+- React·Capacitor·Tailwind 같은 **라이브러리** 사용법은 `context7`로 `package.json`에 적힌 버전의 문서를 찾는다(브라우저 기본 기능 = modern-web-guidance, 라이브러리 = context7).
+- 화면 확인(폰·PC 크기, 콘솔 에러)은 `chrome-devtools-mcp`로 **localhost에 띄운 앱만** 연다.
 - 이미 만든 앱을 이어 할 때는 4단계 시작 전에 한 번 "이 앱에서 옛날 방식으로 짠 웹 코드 찾아서 요즘 방식으로 바꿀 수 있는 것" 점검을 돌리고, 바꿀 목록을 `docs/plan.md`에 넣는다. 점검이 모든 패턴을 잡지는 못하니 결과는 직접 확인한다.
 
 ## 디자인 규칙대로
