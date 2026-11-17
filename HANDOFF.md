@@ -1,6 +1,6 @@
 # HANDOFF — 다음 세션 시작 가이드
 
-마지막 갱신: 2026-11-16
+마지막 갱신: 2026-11-17
 
 ## 1. 한 줄 요약
 이석균 선배님 특강(AI 기초)의 방식대로 앱을 만드는 **작업장 견본**이다. 사용자는 **사장**, Claude의 팀들(기획·디자인·프론트엔드·백엔드·QA)은 **직원**이고, 모든 팀의 결과물은 사장 검토를 받는다. 규칙, `/build-app` 스킬, 교차 리뷰, 훅이 준비되어 있고 아직 만든 앱은 없다. 다음은 첫 앱 만들기.
@@ -15,6 +15,7 @@
 2. GitHub CLI: `winget install GitHub.cli` → `gh auth login --web` → `gh auth setup-git`
 3. 저장소 받기: `git clone <이 저장소 주소>`
 4. 이 폴더를 Claude Code로 처음 열면 superpowers·modern-web-guidance·context7·chrome-devtools-mcp 플러그인 설치를 묻는다 → 모두 "예" (chrome-devtools는 Chrome 브라우저가 깔려 있어야 함)
+   - context7은 처음 한 번 로그인해야 쓸 수 있다: `/mcp` → context7 → Authenticate → 열리는 브라우저에서 로그인. `claude mcp list`에 context7이 `Needs authentication`으로 나오면 아직 안 한 것
 5. git 이름·이메일이 없으면: `git config user.name "이름"`, `git config user.email "메일"`
 6. 팀 기본 기술 도구 (첫 앱을 만들 때 Claude가 필요한 것만 설치를 안내한다):
    - Java (백엔드팀): `winget install --id EclipseAdoptium.Temurin.21.JDK -e` (Mac `brew install --cask temurin@21`)
