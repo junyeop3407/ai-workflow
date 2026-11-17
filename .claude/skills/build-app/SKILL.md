@@ -24,7 +24,7 @@ description: Use when the user asks to build a new app or program in this reposi
 | 3 ★ | **QA팀**: "뭐가 되면 끝인가" 테스트 목록을 쉬운 말로(견본 파일이 있으면 "견본 N쌍을 넣으면 정답 파일과 똑같이 나온다"를 맨 위에) → **사장 검토(승인)**. 승인 후 테스트 코드 작성(승인 목록은 Playwright, 까다로운 계산·날짜는 부품 단위 테스트 추가) | `docs/tests.md`, `tests/` | superpowers:test-driven-development |
 | 4 ★ | **계획 모드로 계획**(아래 "계획 모드" 절, 작은 앱이어도 단계 3~6줄) → (화면이 있으면) **디자인팀** `docs/DESIGN.md` + 시안 캡처 → **사장 검토** → (서버가 있으면) **백엔드팀** 저장할 데이터·기능 목록(쉬운 말로) → **사장 검토** → 구현 → 테스트 → 실패한 것만 고치기, 전부 통과까지 | `docs/plan.md`, `docs/NOTES.md` | superpowers:writing-plans, superpowers:subagent-driven-development |
 | 5 | **QA팀**: ① `qa-reviewer` 에이전트(구현 대화를 넘기지 않음)에게 앱 폴더 경로와 `docs/tests.md`만 주고 리뷰 ② **교차 리뷰(필수, Gemini)**: 아래 "교차 리뷰" 절 순서대로 → 둘에서 나온 진짜 문제만 고치고 테스트 다시 실행 | `docs/review.md`, `docs/review_result.md` | superpowers:requesting-code-review |
-| 6 ★ | `test-runner`로 테스트를 돌려 통과 확인 → (화면이 있으면) **DevTools 점검**(chrome-devtools-mcp, 아래 스킬 사용 표) → **레드팀 공격**(아래 "레드팀 공격" 절) → (공개가 필요하면 아래 "올리기") → **QA 보고**(테스트 N/N 통과, 리뷰에서 찾고 고친 것, 교차 리뷰 "반영한 지적 / 반영 안 한 지적(이유) / 사장 확인 필요한 것", 보안 "배포 전 체크리스트" 12개 ✓/✗ + 레드팀에서 찾은 구멍 N개 → 고침, 화면이 있으면 DevTools 점검 콘솔 에러·실패 요청·LCP) + 실행 방법 한두 줄 → **사장 검토**: 써 보고 OK → **저장소 공개 여부 묻기**(아래 "저장소 공개 여부") | `HANDOFF.md`, 루트 `HANDOFF.md` | superpowers:verification-before-completion |
+| 6 ★ | `test-runner`로 테스트를 돌려 통과 확인 → (화면이 있으면) **DevTools 점검**(chrome-devtools-mcp, 아래 스킬 사용 표) → **레드팀 공격**(아래 "레드팀 공격" 절) → (공개가 필요하면 아래 "올리기") → **QA 보고**(테스트 N/N 통과, 리뷰에서 찾고 고친 것, 교차 리뷰 "반영한 지적 / 반영 안 한 지적(이유) / 사장 확인 필요한 것", 보안 "배포 전 체크리스트" 16개 ✓/✗ + 레드팀에서 찾은 구멍 N개 → 고침, 화면이 있으면 DevTools 점검 콘솔 에러·실패 요청·LCP) + 실행 방법 한두 줄 → **사장 검토**: 써 보고 OK → **저장소 공개 여부 묻기**(아래 "저장소 공개 여부") | `HANDOFF.md`, 루트 `HANDOFF.md` | superpowers:verification-before-completion |
 
 ★ 단계에서는 사장의 OK를 받기 전에 그 결과물을 바탕으로 다음 일을 시작하지 않는다. 수정 지시를 받으면 고쳐서 다시 검토받는다. 코드는 3단계 승인 뒤에만 쓴다.
 
@@ -192,6 +192,10 @@ description: Use when the user asks to build a new app or program in this reposi
 10. 로그인·인증번호·AI 기능에 요청 횟수 제한이 있고, 토큰을 바꾸거나 만료된 토큰으로는 아무것도 안 된다
 11. 쿠폰·포인트·재고·결제 확인을 동시에 20번 보내도 한 번만 처리된다
 12. `apps/<앱>/.redteam-needed` 표시가 없다(민감한 파일을 고친 뒤 레드팀을 다시 돌렸다)
+13. 결제는 PG사를 쓰고, 서버가 PG사에 결제 내역을 다시 조회해 확인한 뒤에만 주문을 확정한다
+14. 회원가입 동의를 필수·선택으로 따로 받고, 선택에 동의하지 않아도 가입된다
+15. 화면 하단에 개인정보처리방침·이용약관 링크와 사업자 정보가 있다(문구는 사장에게 받은 것)
+16. 연습용 DB와 운영 DB가 나뉘어 있고, 운영 DB는 매일 자동 백업된다
 
 ## 올리기 (친구에게 링크로 보여 줘야 할 때)
 - 작업 저장소에는 문서·테스트·기록이 섞여 있으므로 그대로 내보내지 않는다. 앱 파일만 담은 **공개 저장소 + GitHub Pages**를 쓴다(내역은 각자 기기에만 저장되는 앱일 때).
