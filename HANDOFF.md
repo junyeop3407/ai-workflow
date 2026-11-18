@@ -20,7 +20,7 @@
 6. 팀 기본 기술 도구 (첫 앱을 만들 때 Claude가 필요한 것만 설치를 안내한다):
    - Java (백엔드팀): `winget install --id EclipseAdoptium.Temurin.21.JDK -e` (Mac `brew install --cask temurin@21`)
    - Node.js (프론트엔드팀·디자인팀·QA팀의 React, Vite, Tailwind, Playwright, Vitest): `winget install --id OpenJS.NodeJS.LTS -e` (Mac `brew install node`)
-   - Playwright 브라우저 (QA팀, 앱 폴더에서 한 번): `npx playwright install chromium`
+   - Playwright 브라우저 (QA팀, 앱 폴더에서 한 번): `npx playwright install chromium webkit` (webkit은 Safari 엔진, 호환성 테스트용)
    - 파이썬으로 테스트하는 앱일 때만: `py -m pip install pytest playwright` → `py -m playwright install chromium` (Mac은 `python3`)
 
 ## 4. 로드맵
@@ -35,6 +35,7 @@
 | 최신 웹 표준 | Chrome 팀 modern-web-guidance 플러그인 자동 설치·자동 사용(화면 코드 전 가이드 검색, iOS Safari Baseline 기준, 이어 하는 앱 현대화 점검) | ✅ 2026-11-16 |
 | MCP 2개 | context7(라이브러리 버전별 최신 문서, 코드 작성 전 자동), chrome-devtools-mcp(6단계 콘솔·네트워크·성능 점검) 플러그인 자동 설치·자동 사용. playwright·github·filesystem MCP는 기존 기능(Playwright 테스트·webapp-testing, gh CLI, 기본 파일 도구)과 겹쳐서 넣지 않음 | ✅ 2026-11-16 |
 | 출시 전 점검 | 결제는 PG사 결제 확인 후 주문 확정, 가입 동의 필수·선택 분리, 하단 개인정보처리방침·약관·사업자 정보, 연습용·운영 DB 분리 + 매일 백업 (security.md 5·6절, 배포 전 체크리스트 12 → 16개) | ✅ 2026-11-18 |
+| 품질 점검 | Safari 엔진(webkit)·폰 화면 호환성 테스트, axe 자동 접근성 검사, 성능 기준(LCP 2.5초·CLS 0.1), 서버 앱 부하 테스트(동시 50명, localhost), 탐색·사용성 점검(선택, 예상 비용 고지 후 사장 "진행해"일 때만). 배포 전 체크리스트 16 → 20개 | ✅ 2026-11-18 |
 
 ## 5. 파일 구조
 ```
