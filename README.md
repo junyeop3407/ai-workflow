@@ -19,6 +19,7 @@ Claude Code가 혼자 돌려서 앱을 만드는 작업장 견본입니다.
 | `.claude/agents/` | `test-runner`, `qa-reviewer`, `red-team` | 자기 컨텍스트에서 일하고 요약만 돌려줘 메인 대화가 가벼움 |
 
 - `/build-app` 순서: 질문 → 설계안 3개 → 테스트 목록 승인 → 구현 → 별도 리뷰 + **교차 리뷰**(Gemini, 필수) → 레드팀 → 확인·올리기
+- 플러그인: superpowers, modern-web-guidance, context7, chrome-devtools-mcp, **ECC**(affaan-m/ECC — 시장조사·Spring·테스트 가이드, 빌드 에러 해결·언어별 리뷰 에이전트만 골라 씀, ECC 훅은 꺼 둠)
 - `HANDOFF.md`: 어느 컴퓨터에서든 여기서 이어서 시작
 - `setup/new-project/`: 어디서든 "새 프로젝트 만들어 줘"로 이 견본을 꺼내 쓰는 개인 스킬
 

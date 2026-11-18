@@ -75,6 +75,7 @@
 - 처음 보는 저장소나 큰 코드를 파악할 때: `/graphify`
 - 배포하거나 저장소를 공개하기 전: `security-audit`
 - 발표자료가 필요할 때: `junyeop-clean-ppt`
+- 앱을 알릴 때(ECC 플러그인): 말투 정리 `ecc:brand-voice`, 출시 캠페인 `ecc:marketing-campaign`, 글 하나를 여러 플랫폼용으로 `ecc:content-engine`, 검색 노출 `ecc:seo`
 - 스킬이 설치돼 있지 않으면 건너뛰지 말고 `junyeop3407/claude-setup` 설치 스크립트 실행을 부탁한다. headroom은 컨텍스트 압축 도구라 따로 부르지 않는다.
 
 ## 필요한 것이 없을 때 (대신하지 말고 멈춰서 알린다)

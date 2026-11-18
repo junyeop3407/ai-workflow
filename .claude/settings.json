@@ -1,9 +1,21 @@
 {
+  "env": {
+    "ECC_HOOKS_ENABLED": "false"
+  },
+  "extraKnownMarketplaces": {
+    "ecc": {
+      "source": {
+        "source": "github",
+        "repo": "affaan-m/ECC"
+      }
+    }
+  },
   "enabledPlugins": {
     "superpowers@claude-plugins-official": true,
     "modern-web-guidance@claude-plugins-official": true,
     "context7@claude-plugins-official": true,
-    "chrome-devtools-mcp@claude-plugins-official": true
+    "chrome-devtools-mcp@claude-plugins-official": true,
+    "ecc@ecc": true
   },
   "hooks": {
     "PreToolUse": [

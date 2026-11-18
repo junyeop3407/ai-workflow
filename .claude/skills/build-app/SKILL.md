@@ -62,14 +62,19 @@ description: Use when the user asks to build a new app or program in this reposi
 
 ## 스킬 사용 표 (사장이 말하지 않아도 그 시점에 반드시 부른다)
 스킬이 설치돼 있지 않으면 건너뛰지 말고, 사장에게 `junyeop3407/claude-setup`의 설치 스크립트 실행을 부탁한다. 순서가 겹치면 이 파일 절차가 우선이다. superpowers 플러그인과 겹치는 부분도 이 파일을 따른다.
+ECC 플러그인(`ecc:` 이름)은 아래 표에 적힌 것만 쓴다. ECC의 계획·TDD 명령(`/ecc:plan`, `/ecc:tdd` 등)은 superpowers·이 파일 절차와 겹쳐서 쓰지 않는다. ECC 훅은 `settings.json`에서 꺼 두었다(이 저장소 훅과 겹침).
 
 | 언제 | 스킬 | 하는 일 |
 |---|---|---|
 | 1단계 기획 조사 | agent-reach | Reddit·YouTube 등에서 비슷한 서비스와 사용자 반응 조사 (읽기만) |
+| 1단계 기획 조사 | ecc:market-research | 경쟁 서비스 3~5곳의 가격·강점을 표로, 출처와 함께 → 기획서 "비슷한 서비스" |
 | 2단계 디자인 방향 고르기 | awesome-design | "토스 느낌"처럼 서비스 이름이 나오면 그 디자인 시스템 참고 |
 | 4단계 디자인팀 시안·DESIGN.md | hallmark, frontend-design | AI 티 안 나는 화면 방향과 구성 |
 | 4단계 화면 다듬기 | emil-design-eng | 버튼·애니메이션 같은 작은 디테일 |
 | 모든 코드 작성·수정 (4단계) | ponytail | 필요한 만큼만 짓되 검증·보안·예외 처리는 빼지 않음 |
+| 백엔드 코드 작성·수정 (4단계, 서버가 있는 앱) | ecc:springboot-patterns, ecc:springboot-security, ecc:java-coding-standards | Spring 구조·API 설계, 로그인·권한·입력 검증, Java 코드 규칙. 버전별 API는 context7이 우선 |
+| 테스트 코드 작성 (3·4단계) | ecc:e2e-testing, ecc:react-testing | Playwright 화면 테스트, Vitest 부품 테스트 짜는 방법 |
+| 빌드가 안 될 때 (4단계) | `ecc:java-build-resolver`, `ecc:react-build-resolver` 에이전트 | 빌드 에러만 최소로 고침. 고친 뒤 `test-runner`로 다시 확인 |
 | 화면 코드 작성·수정 전 (4단계, 매번) | modern-web-guidance | 그 작업의 최신 웹 표준 가이드를 먼저 찾아 브라우저 기본 기능으로 짬. iOS Safari 호환(Baseline Widely available) 기준. 자세한 건 `.claude/rules/web-and-mobile.md` |
 | 이어 하는 앱, 4단계 시작 전 | modern-web-guidance (점검) | 옛날 방식 웹 코드를 찾아 바꿀 목록을 `docs/plan.md`에 |
 | 라이브러리를 쓰는 코드 작성·수정 전, 설치·버전 올릴 때 (2·4단계, 매번) | context7 (MCP) | React·Capacitor·Tailwind·Vite·Spring·Playwright 등 **그 앱에 깔린 버전**의 공식 문서를 먼저 찾아 보고 짠다. 기억에 의존해 API를 쓰지 않는다. 브라우저 기본 기능은 modern-web-guidance, 라이브러리는 context7 |
@@ -77,6 +82,7 @@ description: Use when the user asks to build a new app or program in this reposi
 | 화면 완성 후, 6단계 전 | web-design-guidelines | 접근성·UI 가이드라인 점검 |
 | 화면 완성 후, 6단계 전 | break-ui | 긴 이름·빈 목록·큰 숫자 같은 최악의 데이터로 깨지는지 확인 |
 | QA팀 브라우저 테스트 | webapp-testing | Playwright로 로컬 앱을 실제로 조작하고 캡처 |
+| 5단계 리뷰 (바뀐 파일의 언어에 맞춰) | `ecc:react-reviewer`, `ecc:java-reviewer` 에이전트 | `qa-reviewer`와 따로 언어별 리뷰. 나온 지적은 `docs/review.md`에 합침 |
 | 5단계 리뷰 | code-review | `qa-reviewer` 에이전트 리뷰와 함께 (Gemini 교차 리뷰도) |
 | 코드를 고칠 때마다 (자동) | security-guidance | 위험한 코드 패턴 경고. 훅이라 따로 부르지 않음 |
 | 6단계 공개 전 | security-audit | 저장소 전체 보안 감사. 확인된 문제는 고치고 QA 보고에 넣음 |
