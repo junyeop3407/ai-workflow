@@ -12,7 +12,8 @@
 #     (승인 스크립트를 흉내 낸 새 스크립트로 다시 잠그는 우회 차단. .md 문서와 .claude/hooks/ 는 제외)
 # Bash/PowerShell:
 #   - 명령에 approve-tests·.approved 글자가 있으면 → 막음(exit 2). 승인은 사장만 한다.
-#     단, 읽기만 하는 명령(git log/diff/show/status, cat, head, tail, grep, sha256sum, 리디렉션·tee 없음)은 통과.
+#     단, 읽기만 하는 명령(git log/diff/show/status, cat, head, tail, grep, sha256sum, 리디렉션·tee 없음)과
+#     git add <경로>(-A·-u 포함), git commit -m "<메시지>"(메시지 안 글자는 무시)는 통과. ; && | 로 붙은 다른 명령은 그대로 검사.
 # 글자 검사라 완벽하지 않다(문자열을 쪼개 만드는 우회 등). 그래서 check-approved.sh가 커밋 직전·Stop에서
 # 해시를 다시 비교하고, 5단계 qa-reviewer가 .approved 변경 기록을 본다.
 # jq 없이 동작한다.
@@ -34,11 +35,16 @@ if [ "$tool" = "Bash" ] || [ "$tool" = "PowerShell" ]; then
     | sed 's/"[[:space:]]*,[[:space:]]*"[a-z_]*"[[:space:]]*:.*//; s/"[[:space:]]*}.*//' | sed 's/\\"/"/g; s/\\\\/\\/g')"
   printf '%s' "$cmd" | grep -Eq 'approve-tests|\.approved' || exit 0
 
-  # 읽기만 하는 명령인지
+  # 읽기만 하는 명령(+ git add / git commit -m)인지
   readonly_ok() {
     local c="$1"
-    # 명령 치환·tee·파일로 내보내는 옵션은 읽기가 아님
-    printf '%s' "$c" | grep -Eq '\$\(|`|(^|[^A-Za-z])tee([^A-Za-z]|$)|--output' && return 1
+    # 명령 치환은 메시지 안에 있어도 실행되므로 먼저 막는다
+    printf '%s' "$c" | grep -Eq '\$\(|`' && return 1
+    # git commit -m "<메시지>" / -m '<메시지>' 의 메시지는 글자일 뿐이라 지우고 본다
+    # (메시지 안의 ; && | > approve-tests .approved 때문에 막히지 않게. 메시지 밖은 그대로 검사)
+    c="$(printf '%s' "$c" | sed -E "s/(-[a-zA-Z]*m|--message)(=|[[:space:]]+)\"([^\"\\\\]|\\\\.)*\"/-m MSG/g; s/(-[a-zA-Z]*m|--message)(=|[[:space:]]+)'[^']*'/-m MSG/g")"
+    # tee·파일로 내보내는 옵션은 읽기가 아님
+    printf '%s' "$c" | grep -Eq '(^|[^A-Za-z])tee([^A-Za-z]|$)|--output' && return 1
     # 2>&1, >/dev/null 은 무해하니 지우고, 그래도 > 가 남으면 쓰기
     c="$(printf '%s' "$c" | sed -E 's/[0-9]*>&[0-9]+//g; s#[0-9]*>>?[[:space:]]*/dev/null##g')"
     printf '%s' "$c" | grep -q '>' && return 1
@@ -48,7 +54,9 @@ if [ "$tool" = "Bash" ] || [ "$tool" = "PowerShell" ]; then
     while IFS= read -r seg; do
       seg="$(printf '%s' "$seg" | sed -E 's/^[[:space:]]+//; s/[[:space:]]+$//')"
       [ -z "$seg" ] && continue
-      printf '%s' "$seg" | grep -Eq '^(git([[:space:]]+-[^[:space:]]+)*[[:space:]]+(log|diff|show|status)|cat|head|tail|grep|sha256sum)([[:space:]]|$)' || return 1
+      # git add(경로·-A·-u 등)는 파일을 바꾸지 않고 올리기만 하고, git commit은 올린 것을 기록만 한다.
+      # 승인 테스트가 실제로 바뀌었으면 check-approved.sh가 커밋 직전에 해시로 막는다.
+      printf '%s' "$seg" | grep -Eq '^(git([[:space:]]+-[^[:space:]]+)*[[:space:]]+(log|diff|show|status|add|commit)|cat|head|tail|grep|sha256sum)([[:space:]]|$)' || return 1
     done <<< "$segs"
     return 0
   }
