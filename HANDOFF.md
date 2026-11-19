@@ -1,6 +1,6 @@
 # HANDOFF — 다음 세션 시작 가이드
 
-마지막 갱신: 2026-11-19
+마지막 갱신: 2026-11-20
 
 ## 1. 한 줄 요약
 이석균 선배님 특강(AI 기초)의 방식대로 앱을 만드는 **작업장 견본**이다. 사용자는 **사장**, Claude의 팀들(기획·디자인·프론트엔드·백엔드·QA)은 **직원**이고, 모든 팀의 결과물은 사장 검토를 받는다. 규칙, `/build-app` 스킬, 교차 리뷰, 훅이 준비되어 있고 아직 만든 앱은 없다. 다음은 첫 앱 만들기.
@@ -37,6 +37,7 @@
 | 출시 전 점검 | 결제는 PG사 결제 확인 후 주문 확정, 가입 동의 필수·선택 분리, 하단 개인정보처리방침·약관·사업자 정보, 연습용·운영 DB 분리 + 매일 백업 (security.md 5·6절, 배포 전 체크리스트 12 → 16개) | ✅ 2026-11-18 |
 | ECC 플러그인 | affaan-m/ECC 자동 설치(공식 저장소만). 쓰는 것만 골라 `/build-app` 스킬 표에 넣음: 시장조사, Spring·테스트 작성 가이드, 빌드 에러 해결·언어별 리뷰 에이전트. 앱 밖: 말투·마케팅·콘텐츠·SEO. ECC 훅은 꺼 둠(이 저장소 훅과 겹치고 매 동작마다 느려짐), 계획·TDD 명령은 superpowers와 겹쳐 안 씀, ECC 규칙(rules)은 항상 읽혀 컨텍스트를 먹어서 안 넣음 | ✅ 2026-11-19 |
 | 품질 점검 | Safari 엔진(webkit)·폰 화면 호환성 테스트, axe 자동 접근성 검사, 성능 기준(LCP 2.5초·CLS 0.1), 서버 앱 부하 테스트(동시 50명, localhost), 탐색·사용성 점검(선택, 예상 비용 고지 후 사장 "진행해"일 때만). 배포 전 체크리스트 16 → 20개 | ✅ 2026-11-18 |
+| 루프 다섯 칸 | 목표·채점표에 더해 **일지**(`progress.md`)·**브레이크**(15회·같은 실패 3회·디버깅 후에도 안 되면 사장 보고)·**잠금**(`tests/.approved` 해시, 사장만 잠금, Bash로 고쳐도 커밋 직전·Stop에서 잡음). 4단계는 `/goal` 한 문장. 교차 리뷰 Codex+Gemini(4단계 단계별 Codex, 5단계 Claude→Codex→Gemini). "해결됐어요 / 아직이에요" 확인 루프. qa-reviewer·red-team 메모리(공개 저장소라 일반 패턴만), `/weekly-review`. 예약 작업 없이 세션 시작 때 점검. 훅 시험 `test-hooks.sh` | ✅ 2026-11-20 |
 
 ## 5. 파일 구조
 ```
@@ -47,18 +48,27 @@
 │   └── testing.md                         테스트 (tests/·테스트 파일)
 ├── .claude/agents/                        서브에이전트 (요약만 돌려줌)
 │   ├── test-runner.md                     테스트 실행 → N/N + 실패 요약
-│   ├── qa-reviewer.md                     5단계 분리 리뷰
-│   └── red-team.md                        6단계 실행 중인 앱 공격
+│   ├── qa-reviewer.md                     5단계 분리 리뷰 (memory: project)
+│   └── red-team.md                        6단계 실행 중인 앱 공격 (memory: project)
+├── .claude/agent-memory/                  qa-reviewer·red-team 메모리 (커밋됨, 일반 패턴만)
+├── .claude/skills/weekly-review/SKILL.md  /weekly-review 주간 회고 (반복된 실수 → 규칙 후보 최대 3개)
+├── docs/last-weekly-review.txt            마지막 주간 회고 날짜 (세션 시작 훅이 읽음)
 ├── .claude/skills/handoff/SKILL.md        /handoff 단계 마무리 (HANDOFF → 커밋 → 푸시)
 ├── HANDOFF.md                             이 파일 (저장소 전체 현황)
 ├── README.md                              이 견본을 새 프로젝트에 쓰는 방법
 ├── .claude/skills/build-app/SKILL.md      /build-app 절차 (앱 하나 한 바퀴, 기능 추가도 같은 순서)
 ├── .claude/skills/build-app/templates/    견본 파일 (파이썬으로 테스트하는 앱용 run.sh)
-├── .claude/skills/build-app/cross-review.sh  교차 리뷰 (필수, Gemini CLI로 변경분 리뷰)
+├── .claude/skills/build-app/cross-review.sh  교차 리뷰 (필수, Codex·Gemini CLI로 변경분 리뷰, snapshot 기준점)
 ├── setup/new-project/SKILL.md             "새 프로젝트 만들어 줘" 개인 스킬 (README 참고해 설치)
 ├── .claude/hooks/check-tests.sh           테스트 실패 시 커밋·완료 보고 막기
 ├── .claude/hooks/guard-git.sh             강제 푸시·기록 수정·저장소 삭제 차단, 커밋 전 비밀값·.env·절대경로 검사
-├── .claude/hooks/protect-tests.sh         커밋된(승인된) 테스트 수정 시 사장 확인 창
+├── .claude/hooks/protect-tests.sh         승인 목록(.approved)의 테스트 수정 시 사장 확인 창, Claude의 승인 스크립트 실행 차단
+├── .claude/hooks/approve-tests.sh         승인된 테스트 잠그기 (사장만 ! 로 실행)
+├── .claude/hooks/check-approved.sh        커밋 직전·Stop에서 승인 테스트 해시 비교
+├── .claude/hooks/flag-redteam.sh          민감한 파일 수정·커밋 시 .redteam-needed 표시
+├── .claude/hooks/agent-memory-only.sh     검수 에이전트는 자기 메모리 폴더만 쓰게
+├── .claude/hooks/session-start.sh         세션 시작 점검·주간 회고 알림 (예약 작업 대신)
+├── .claude/hooks/test-hooks.sh            훅 시험 (가짜 입력으로 막힘/통과 표)
 ├── .claude/settings.json                  훅 등록, 플러그인 켜기(superpowers·modern-web-guidance·context7·chrome-devtools-mcp·ecc), ECC 훅 끄기
 └── apps/                                  앱 하나당 폴더 하나 (아직 비어 있음)
 ```
@@ -77,4 +87,6 @@
 - 새 규칙을 넣을 때: 매번 알아야 하는 사실 → CLAUDE.md(200줄 이하 유지), 한 주제·한 경로 규칙 → `.claude/rules/`(파일 위 `paths:`), 절차 → 스킬, 절대 어기면 안 되는 것 → 훅, 출력이 긴 일 → 에이전트.
 - ECC 플러그인은 Node.js가 있어야 한다(훅을 꺼 둬도 시작 검사가 node로 돈다). 교차 리뷰 때문에 어차피 설치하는 것.
 - 훅은 jq 없이 grep/sed로 동작한다(Windows Git Bash에 jq가 없는 경우가 많음).
+- 훅을 고치면 `bash .claude/hooks/test-hooks.sh --settings`로 막힘/통과 표를 다시 확인한다.
+- `/goal`은 사장이 입력하는 내장 명령이다(Claude가 켤 수 없음). 4단계에서 Claude가 값을 채운 한 줄을 주면 사장이 붙여 넣는다.
 - 사장이 준 실제 엑셀·CSV 등은 `apps/<앱>/samples/`(커밋 안 함, 그 컴퓨터에만 있음). 테스트에는 칸·형식이 같은 가짜 견본을 `tests/fixtures/`에. 그 밖의 엑셀·CSV·hwp는 guard-git이 커밋을 막는다.

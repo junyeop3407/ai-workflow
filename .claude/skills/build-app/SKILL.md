@@ -11,7 +11,7 @@ description: Use when the user asks to build a new app or program in this reposi
 
 ## 시작할 때
 1. `git pull` → 루트 `HANDOFF.md` 읽기.
-2. `apps/<앱>/HANDOFF.md`가 있으면 거기 적힌 "현재 단계"부터 이어 한다. 끝난 단계는 다시 묻지 않는다. `docs/spec.md`가 있으면 이어 하기 전에 먼저 읽는다.
+2. `apps/<앱>/HANDOFF.md`가 있으면 거기 적힌 "현재 단계"부터 이어 한다. 끝난 단계는 다시 묻지 않는다. **`docs/progress.md`(구현 일지)가 있으면 그다음 바로 읽고 마지막 회차의 "다음 시도"부터 잇는다.** `docs/spec.md`가 있으면 이어 하기 전에 먼저 읽는다.
 3. 없으면 `apps/<앱이름>/`(영문 소문자-하이픈)과 `docs/`, `tests/`를 만들고 1단계부터.
 4. **이미 있는 앱에 기능을 더할 때**도 1~6단계를 그대로 한 바퀴 돈다(짧게). 문서는 새로 만들지 않고 `requirements.md`·`tests.md`·`design.md`에 "## N차" 절을 덧붙이고, 새 테스트는 `tests/test_vN.py`에 둔다. `spec.md`만은 "N차" 절 없이 바뀐 대로 고쳐 늘 지금 상태를 담는다. 앱 종류가 그대로면 2단계는 "바뀌는 설계 한두 가지 + 추천"으로 줄여도 된다.
 
@@ -21,10 +21,10 @@ description: Use when the user asks to build a new app or program in this reposi
 |---|---|---|---|
 | 1 ★ | **기획팀**: 요구사항 질문(AskUserQuestion으로 보기 + 추천을 붙여 클릭으로 답하게. 최소한 "누가, 어디서(폰/PC), 꼭 되어야 할 기능, 저장이 필요한지". 지금 손으로 하는 일을 대신하는 앱이면 **"실제로 쓰는 변환 전/후 파일이 있나요?"**도 묻는다 → 아래 "견본 파일" 절) → 기획서(목표·사용자·기능 우선순위·하지 않을 것·화면 흐름도 Mermaid)로 정리 → **사장 검토** → OK 뒤 Claude가 스스로 파악용 명세서 작성(아래 "명세서" 절, 사장 검토 대상 아님). 명세서를 쓰다 "아직 안 정한 것"이 나오면 AskUserQuestion으로 물어 채운다 | `docs/requirements.md`, `docs/spec.md` | superpowers:brainstorming |
 | 2 ★ | 설계안 3개(CLAUDE.md "팀별 기본 기술" 안에서, 초보가 쓰기 쉬운 순서, 설치 필요 여부·장단점·추천 표시) + 화면이 있는 앱이면 디자인 방향 보기 2~3개(예: 깔끔한 흰색, 토스 느낌) → 사용자가 고름 | `docs/design.md` (고른 안 + 버린 안과 이유) | superpowers:brainstorming |
-| 3 ★ | **QA팀**: "뭐가 되면 끝인가" 테스트 목록을 쉬운 말로(견본 파일이 있으면 "견본 N쌍을 넣으면 정답 파일과 똑같이 나온다"를 맨 위에) → **사장 검토(승인)**. 승인 후 테스트 코드 작성(승인 목록은 Playwright, 까다로운 계산·날짜는 부품 단위 테스트 추가) | `docs/tests.md`, `tests/` | superpowers:test-driven-development |
-| 4 ★ | **계획 모드로 계획**(아래 "계획 모드" 절, 작은 앱이어도 단계 3~6줄) → (화면이 있으면) **디자인팀** `docs/DESIGN.md` + 시안 캡처 → **사장 검토** → (서버가 있으면) **백엔드팀** 저장할 데이터·기능 목록(쉬운 말로) → **사장 검토** → 구현 → 테스트 → 실패한 것만 고치기, 전부 통과까지 | `docs/plan.md`, `docs/NOTES.md` | superpowers:writing-plans, superpowers:subagent-driven-development |
-| 5 | **QA팀**: ① `qa-reviewer` 에이전트(구현 대화를 넘기지 않음)에게 앱 폴더 경로와 `docs/tests.md`만 주고 리뷰 ② **교차 리뷰(필수, Gemini)**: 아래 "교차 리뷰" 절 순서대로 → 둘에서 나온 진짜 문제만 고치고 테스트 다시 실행 | `docs/review.md`, `docs/review_result.md` | superpowers:requesting-code-review |
-| 6 ★ | `test-runner`로 테스트를 돌려 통과 확인 → (화면이 있으면) **DevTools 점검**(chrome-devtools-mcp, 아래 스킬 사용 표) → **탐색·사용성 점검**(선택: 예상 비용을 먼저 알리고 사장이 "진행해"라고 할 때만, 아래 "탐색·사용성 점검" 절) → (서버가 있으면) **부하 테스트**(`.claude/rules/testing.md` "품질 점검") → **레드팀 공격**(아래 "레드팀 공격" 절) → (공개가 필요하면 아래 "올리기") → **QA 보고**(테스트 N/N 통과, 리뷰에서 찾고 고친 것, 교차 리뷰 "반영한 지적 / 반영 안 한 지적(이유) / 사장 확인 필요한 것", 보안 "배포 전 체크리스트" 20개 ✓/✗ + 레드팀에서 찾은 구멍 N개 → 고침, 화면이 있으면 DevTools 점검 콘솔 에러·실패 요청·LCP, 탐색·사용성 점검 결과 또는 "건너뜀(사장 선택)") + 실행 방법 한두 줄 → **사장 검토**: 써 보고 OK → **저장소 공개 여부 묻기**(아래 "저장소 공개 여부") | `HANDOFF.md`, 루트 `HANDOFF.md` | superpowers:verification-before-completion |
+| 3 ★ | **QA팀**: "뭐가 되면 끝인가" 테스트 목록을 쉬운 말로(견본 파일이 있으면 "견본 N쌍을 넣으면 정답 파일과 똑같이 나온다"를 맨 위에) → **사장 검토(승인)**. 승인 후 테스트 코드 작성(승인 목록은 Playwright, 까다로운 계산·날짜는 부품 단위 테스트 추가) → **잠그기: 사장에게 `! bash .claude/hooks/approve-tests.sh apps/<앱>` 한 줄 실행을 부탁**(Claude는 실행하지 않는다. 훅이 막는다) → `tests/.approved` 생긴 것 확인 | `docs/tests.md`, `tests/`, `tests/.approved` | superpowers:test-driven-development |
+| 4 ★ | **계획 모드로 계획**(아래 "계획 모드" 절, 작은 앱이어도 단계 3~6줄) → (화면이 있으면) **디자인팀** `docs/DESIGN.md` + 시안 캡처 → **사장 검토** → (서버가 있으면) **백엔드팀** 저장할 데이터·기능 목록(쉬운 말로) → **사장 검토** → **구현 루프**(아래 "구현 루프 (/goal)" 절: 사장이 `/goal` 한 줄을 붙여 넣으면 전부 통과까지 혼자 돎, 매 회차 `progress.md`) → plan.md 단계 하나가 통과할 때마다 그 단계 변경분을 **Codex 빠른 검수**(1라운드) | `docs/plan.md`, `docs/progress.md`, `docs/NOTES.md` | superpowers:writing-plans, superpowers:subagent-driven-development |
+| 5 | **QA팀**: ① `qa-reviewer` 에이전트(구현 대화를 넘기지 않음)에게 앱 폴더 경로와 `docs/tests.md`만 주고 리뷰 → ② **Codex 교차 리뷰(필수)** → ③ **Gemini 교차 리뷰(필수)**: 아래 "교차 리뷰" 절 순서대로, 각 1라운드 → 셋에서 나온 진짜 문제만 고치고(5회 루프) 테스트 다시 실행 | `docs/review.md`, `docs/review_codex.md`, `docs/review_result.md` | superpowers:requesting-code-review |
+| 6 ★ | `test-runner`로 테스트를 돌려 통과 확인 → (화면이 있으면) **DevTools 점검**(chrome-devtools-mcp, 아래 스킬 사용 표) → **탐색·사용성 점검**(선택: 예상 비용을 먼저 알리고 사장이 "진행해"라고 할 때만, 아래 "탐색·사용성 점검" 절) → (서버가 있으면) **부하 테스트**(`.claude/rules/testing.md` "품질 점검") → **레드팀 공격**(아래 "레드팀 공격" 절) → (공개가 필요하면 아래 "올리기") → **QA 보고**(테스트 N/N 통과, 리뷰에서 찾고 고친 것, 교차 리뷰 "Codex: 반영 N / 미반영 N(이유) · Gemini: 반영 N / 미반영 N(이유) · 사장 확인 필요", 보안 "배포 전 체크리스트" 20개 ✓/✗ + 레드팀에서 찾은 구멍 N개 → 고침, 화면이 있으면 DevTools 점검 콘솔 에러·실패 요청·LCP, 탐색·사용성 점검 결과 또는 "건너뜀(사장 선택)") + 실행 방법 한두 줄 → **사장 검토**: 써 보고 OK(수정 지시면 아래 "사장 확인 루프") → **저장소 공개 여부 묻기**(아래 "저장소 공개 여부") | `HANDOFF.md`, 루트 `HANDOFF.md` | superpowers:verification-before-completion |
 
 ★ 단계에서는 사장의 OK를 받기 전에 그 결과물을 바탕으로 다음 일을 시작하지 않는다. 수정 지시를 받으면 고쳐서 다시 검토받는다. 코드는 3단계 승인 뒤에만 쓴다.
 
@@ -57,7 +57,7 @@ description: Use when the user asks to build a new app or program in this reposi
 - "커밋"은 항상 커밋 + 푸시다.
 - **3단계 끝에는 커밋하지 않는다.** 테스트를 먼저 쓰면 그 순간은 전부 실패(정상)인데, 실패 상태로는 커밋하지 않기 때문이다. 3단계 결과는 4단계에서 테스트가 통과한 뒤 함께 커밋한다. 그 사이 상태는 `HANDOFF.md`에 적어 둔다.
   - 그 사이에 사용자가 다른 컴퓨터로 옮겨야 한다면: 커밋 전 파일은 따라가지 않는다고 알리고, 4단계를 먼저 끝내자고 권한다. 그래도 지금 옮겨야 하면 실패 상태 커밋은 CLAUDE.md 규칙의 예외라 사용자가 정한다. 훅을 피하려고 `테스트 실행:` 줄을 지우는 식의 우회는 하지 않는다.
-- 4단계 구현을 에이전트에게 맡기면, 결과를 받은 뒤 **`test-runner`로 테스트를 다시 돌리고**, 승인된 테스트 파일이 안 바뀌었는지(`git diff --stat`) 확인한다.
+- 4단계 구현을 에이전트에게 맡기면, 결과를 받은 뒤 **`test-runner`로 테스트를 다시 돌리고**, 승인된 테스트 파일이 안 바뀌었는지 확인한다(`tests/.approved` 해시 — 커밋 직전·응답 끝에 훅 `check-approved.sh`가 자동으로 비교해 다르면 막는다).
 - 루트 `HANDOFF.md`는 앱을 끝냈을 때와 중간에 멈출 때 갱신한다.
 
 ## 스킬 사용 표 (사장이 말하지 않아도 그 시점에 반드시 부른다)
@@ -83,7 +83,7 @@ ECC 플러그인(`ecc:` 이름)은 아래 표에 적힌 것만 쓴다. ECC의 �
 | 화면 완성 후, 6단계 전 | break-ui | 긴 이름·빈 목록·큰 숫자 같은 최악의 데이터로 깨지는지 확인 |
 | QA팀 브라우저 테스트 | webapp-testing | Playwright로 로컬 앱을 실제로 조작하고 캡처 |
 | 5단계 리뷰 (바뀐 파일의 언어에 맞춰) | `ecc:react-reviewer`, `ecc:java-reviewer` 에이전트 | `qa-reviewer`와 따로 언어별 리뷰. 나온 지적은 `docs/review.md`에 합침 |
-| 5단계 리뷰 | code-review | `qa-reviewer` 에이전트 리뷰와 함께 (Gemini 교차 리뷰도) |
+| 5단계 리뷰 | code-review | `qa-reviewer` 에이전트 리뷰와 함께 (Codex·Gemini 교차 리뷰도) |
 | 코드를 고칠 때마다 (자동) | security-guidance | 위험한 코드 패턴 경고. 훅이라 따로 부르지 않음 |
 | 6단계 공개 전 | security-audit | 저장소 전체 보안 감사. 확인된 문제는 고치고 QA 보고에 넣음 |
 | 6단계 QA 보고 전 | (`red-team` 에이전트) | 실행 중인 앱을 직접 공격. 아래 "레드팀 공격" |
@@ -93,8 +93,31 @@ ECC 플러그인(`ecc:` 이름)은 아래 표에 적힌 것만 쓴다. ECC의 �
 | 에이전트 | 언제 | 받는 것 |
 |---|---|---|
 | `test-runner` | 테스트를 돌릴 때마다 (4~6단계) | N/N 통과 + 실패한 테스트 이름과 한 줄 원인. 전체 로그는 `docs/test-log.txt` |
-| `qa-reviewer` | 5단계 ① | 구현 대화 없이 코드·테스트만 보고 찾은 문제 목록 |
+| `qa-reviewer` | 5단계 ① | 구현 대화 없이 코드·테스트만 보고 찾은 문제 목록 (+ `.approved` 변경 기록 점검). 자주 나오는 문제는 자기 메모리에 쌓음 |
 | `red-team` | 6단계 레드팀 | 위치 / 공격 방법 / 막힘·뚫림 / 고치는 방법 표 (심각한 순) |
+
+## 구현 루프 (/goal, 4단계)
+"구현 → 테스트 → 실패한 것만 고치기"를 Claude가 혼자 반복하게 하는 장치. 다섯 칸: **목표**(아래 한 문장) · **채점표**(승인된 테스트) · **일지**(`progress.md`) · **브레이크**(횟수·같은 실패) · **잠금**(`.approved` + 훅).
+1. 시작 전에 `cross-review.sh snapshot apps/<앱>`으로 기준점을 찍어 `progress.md` 맨 위 "단계 1 기준: <해시>"로 적는다(Codex 빠른 검수용).
+2. `/goal`은 사장이 입력하는 내장 명령이라 Claude가 켤 수 없다. 값을 채운 아래 한 줄을 보여 주고 **"이 한 줄을 그대로 붙여 넣어 주세요"**라고 부탁한다.
+   ```
+   /goal apps/<앱>에서 `<테스트 실행 명령>`이 모두 통과할 것. 매 회차 docs/progress.md에 기록하고 test-runner 결과(N/N)를 대화에 보일 것. tests/.approved와 그 목록의 파일은 수정 금지. 15회 안에 안 되거나 같은 테스트가 3회 연속 같은 이유로 실패하면 멈추고 막힌 이유를 사장에게 보고할 것.
+   ```
+   - 판정은 작은 모델이 **대화만 보고** 한다. 그래서 매 회차 test-runner 요약(N/N, 실패 이름)을 대화에 꼭 적는다.
+3. **일지** `apps/<앱>/docs/progress.md` — 매 회차 한 줄 추가(커밋 전에도 파일로 남아 새 세션이 이어 받는다):
+   ```
+   | 회차 | 한 일 | 테스트 N/N | 실패한 테스트와 이유 | 다음 시도 |
+   ```
+4. **plan.md 단계 하나가 통과할 때마다**: `bash .claude/skills/build-app/cross-review.sh apps/<앱> <그 단계 기준 해시> codex` → `review_codex.md`의 맞는 지적만 고침(1라운드, 아래 "교차 리뷰" 판단 규칙) → 다음 단계 기준을 다시 `snapshot`으로 찍어 progress.md에.
+5. **브레이크**: 테스트 하나를 3번 고쳐도 안 되면 superpowers:systematic-debugging으로 원인부터 찾는다. **그래도 안 되면 계속하지 말고 멈춰서 사장에게 보고한다**(무엇이, 왜 막혔는지, 선택지). 15회 한도나 "같은 이유 3회 연속"에 걸려도 같다. 보고 뒤 `/goal clear`를 부탁한다.
+6. **다시 고칠 때**(리뷰·레드팀·사장 수정 지시): 같은 템플릿, 횟수만 5회 ("5회 안에 안 되거나 …").
+7. **`/loop`(선택)**: 오래 걸리는 작업 중 사장이 원할 때만 — 예 `/loop 10m 테스트 돌리고 progress.md 갱신`. 세션을 닫으면 멈춘다. Claude가 혼자 켜지 않는다. 예약 작업(/schedule·데스크톱 예약)은 만들지 않는다(사장 컴퓨터는 밤에 꺼짐).
+
+## 사장 확인 루프 (6단계 사장 검토, 사장 수정 지시를 처리할 때)
+- 고쳤다고 끝내지 않는다. 고친 뒤 AskUserQuestion으로 묻는다: **"해결됐어요" / "아직이에요(무엇이)"**.
+- "아직이에요"면 그 말을 그대로 다음 고치기의 입력으로 삼아 다시 고친다(위 5회 루프).
+- **같은 지적에 3번 "아직이에요"**면 멈추고 원인(왜 안 맞는지 추정)과 선택지 2~3개(+추천)를 보고한다.
+- "해결됐어요"를 받기 전에는 HANDOFF에 "완료"라고 쓰지 않는다.
 
 ## 명세서 (`docs/spec.md`, Claude 파악용)
 사장에게 보여 주는 기획서(`requirements.md`)와 달리, **Claude가 스스로 앱을 정확히 파악하려고 쓰는 작업 기준 문서**다. 대화가 길어지거나 새 세션·다른 컴퓨터에서 이어 할 때 이 파일만 읽으면 앱 전체를 알 수 있어야 한다.
@@ -133,7 +156,8 @@ ECC 플러그인(`ecc:` 이름)은 아래 표에 적힌 것만 쓴다. ECC의 �
 - 리뷰에서 나온 문제는 고치기 전에 **그 문제를 잡는 회귀 테스트를 먼저** 추가해 실패를 확인한다. 회귀 테스트는 승인 목록과 섞지 않고 `tests/test_review_fixes.py`에 둔다(사용자 승인 대상 아님).
 - **리뷰(5단계) 없이는 "완성"이라고 말하지 않는다.** 리뷰에는 사용자가 필요 없으니, 사용자가 자리를 비워도 리뷰를 돌린다. 세션을 끝내야 해서 정말 못 하면: 테스트 통과 상태는 커밋해도 되지만 보고는 "테스트 통과, 리뷰 남음"으로 하고, HANDOFF에 "현재 단계: 5"로 적는다.
 - 실패한 테스트가 있으면 커밋하지 않는다. 남은 실패와 이유는 `NOTES.md`에.
-- 테스트 하나를 3번 고쳐도 통과하지 않으면 멈추고 superpowers:systematic-debugging으로 원인부터 찾는다.
+- 테스트 하나를 3번 고쳐도 통과하지 않으면 멈추고 superpowers:systematic-debugging으로 원인부터 찾는다. **그래도 안 되면 멈추고 사장에게 보고한다**("구현 루프" 5번).
+- **승인 목록(`tests/.approved`)은 직접이든 간접이든(스크립트를 새로 쓰거나 이름을 바꿔 돌리기 등) Claude가 쓰지 않는다.** 다시 잠가야 하면 사장에게 `! bash .claude/hooks/approve-tests.sh apps/<앱>`을 부탁한다. 훅이 Bash·Edit로 쓰는 것을 막고, 커밋 직전·응답 끝에 해시를 비교한다.
 - 대화가 길어져 흐름을 놓칠 것 같으면 HANDOFF를 갱신하고 커밋한 다음, 새 세션에서 "/build-app 이어서"를 하자고 제안한다.
 - 기술은 CLAUDE.md "팀별 기본 기술"(기획 기획서, 디자인 DESIGN.md+Tailwind, 프론트엔드 React, 백엔드 Java+Spring, QA Playwright+Vitest/JUnit)을 따른다. 그 안의 세부(버전, 빌드 도구 등)는 초보가 실행하기 쉬운 쪽을 추천한다. 다른 기술은 사용자가 원할 때만. 경로는 저장소 기준 상대 경로만.
 
@@ -156,19 +180,31 @@ ECC 플러그인(`ecc:` 이름)은 아래 표에 적힌 것만 쓴다. ECC의 �
 
 구현 중(테스트 일부 실패)에 응답을 끝내면 Stop 훅이 한 번 멈춰 세운다. 그때는 "아직 완성 아님, 무엇이 실패 중인지"만 짧게 알리고 계속한다.
 
-## 교차 리뷰 (5단계 ②, 필수)
-이번 작업에서 수정한 코드를 Gemini CLI로 교차 리뷰받고 반영한다. **건너뛰지 않는다.**
+## 교차 리뷰 (필수 — 만든 AI와 다른 AI 두 곳: Codex + Gemini)
+이번 작업에서 수정한 코드를 Claude가 아닌 AI 두 곳에 검수받는다. **둘 다 건너뛰지 않는다.**
 
-1. **리뷰 대상 준비 + 2. Gemini에게 리뷰 요청**: `bash .claude/skills/build-app/cross-review.sh apps/<앱> <리뷰 기준>`
-   - 리뷰 기준은 4단계 구현을 시작하기 직전 커밋. 4단계를 시작할 때 `git rev-parse --short HEAD`를 HANDOFF의 `리뷰 기준:` 줄에 적어 둔다. (기준을 안 주면 커밋 전이면 `git diff`, 브랜치 작업이면 `git diff main...HEAD`)
-   - 스크립트가 변경분 + 변경된 파일 전체 + 그 파일을 import·호출하는 주요 파일을 `docs/review_input.txt`(커밋 안 함)로 묶고, 정해진 질문(버그·보안·예외 처리 누락·성능만, 심각도·파일명·줄 번호·이유·수정 제안, 불확실하면 '추정')으로 `gemini -p`에 보내 `docs/review_result.md`에 저장한다.
-   - Gemini가 없거나 로그인이 안 돼 있으면 스크립트가 실패한다 → 사장에게 설치·로그인을 부탁한다(`!` 한 줄씩: `winget install --id OpenJS.NodeJS.LTS -e` → `npm install -g @google/gemini-cli` → API 키: https://aistudio.google.com/apikey 에서 무료 키를 만들어 사장이 PowerShell에서 `[Environment]::SetEnvironmentVariable("GEMINI_API_KEY", "<키>", "User")` 실행. 키는 대화창에 붙여 넣지 말라고 안내. Google 계정 로그인 방식은 개인 무료 사용이 막혀 안 됨. 무료 키는 pro 모델을 못 써서 스크립트는 flash 모델을 기본으로 쓴다(`GEMINI_MODEL`로 바꿀 수 있음)). 될 때까지 5단계는 끝나지 않는다. HANDOFF에 "현재 단계: 5 (교차 리뷰 대기)"로 적는다.
-   - 앱 코드가 Google 서비스로 보내진다. 안전장치가 막으면 사용자에게 `! bash .claude/skills/build-app/cross-review.sh apps/<앱> <리뷰 기준>` 실행을 부탁한다.
-3. **리뷰 결과 검토**: `review_result.md`를 읽고 각 지적이 실제로 맞는지 코드를 직접 확인해 판단한다.
-   - 맞는 지적은 고친다(Claude 리뷰와 같이 회귀 테스트 먼저). 틀렸거나 불필요한 지적은 반영하지 않은 이유를 `review_result.md` 맨 아래 `## Claude 판단` 절에 지적마다 적는다.
+| 언제 | 누가 | 범위 | 결과 파일 |
+|---|---|---|---|
+| 4단계, plan.md 단계 하나가 통과할 때마다 | Codex | 그 단계 변경분(기준 = 단계 시작 때 찍은 `snapshot` 해시) | `docs/review_codex.md` (덮어씀) |
+| 5단계 ② | Codex | 4단계 시작부터 전체(기준 = HANDOFF `리뷰 기준:`) | `docs/review_codex.md` |
+| 5단계 ③ | Gemini | 같은 전체 | `docs/review_result.md` |
+5단계 순서는 **qa-reviewer(Claude) → Codex → Gemini**, 각 1라운드.
+
+1. **실행**: `bash .claude/skills/build-app/cross-review.sh apps/<앱> <기준> [codex|gemini]` (셋째 값을 안 주면 gemini)
+   - 기준점 찍기(4단계 단계 시작 때): `bash .claude/skills/build-app/cross-review.sh snapshot apps/<앱>` → 나온 해시를 `progress.md`에. 실제 스테이지는 건드리지 않는다.
+   - 리뷰 기준(5단계)은 4단계 구현을 시작하기 직전 커밋. 4단계를 시작할 때 `git rev-parse --short HEAD`를 HANDOFF의 `리뷰 기준:` 줄에 적어 둔다. (기준을 안 주면 커밋 전이면 `git diff`, 브랜치 작업이면 `git diff main...HEAD`)
+   - 스크립트가 변경분 + 변경된 파일 전체 + 그 파일을 import·호출하는 주요 파일을 `docs/review_input.txt`(커밋 안 함)로 묶고, 같은 질문(버그·보안·예외 처리 누락·성능만, 심각도·파일명·줄 번호·이유·수정 제안, 불확실하면 '추정')으로 보낸다. **`.env`·키 파일·`samples/`는 스크립트가 빼고 보낸다.**
+   - Codex는 빈 임시 폴더에서 **읽기 전용**(파일을 못 고치는 모드)으로 돈다. Gemini도 빈 임시 폴더에서 보낸 내용만 본다.
+   - 앱 코드가 OpenAI(Codex)·Google(Gemini) 서비스로 보내진다. 안전장치가 막으면 사용자에게 `! bash .claude/skills/build-app/cross-review.sh …` 실행을 부탁한다.
+   - **도구가 없거나 로그인이 안 돼 있으면 스크립트가 실패한다 → 대신하지 말고 사장에게 설치·로그인을 부탁한다**(`!` 한 줄씩. 키는 대화창에 붙여 넣지 말라고 안내). 될 때까지 그 단계는 끝나지 않는다(HANDOFF에 "현재 단계: 5 (교차 리뷰 대기)").
+     - Codex: `npm install -g @openai/codex` → `codex login`(브라우저에서 ChatGPT 계정 로그인)
+     - Gemini: `winget install --id OpenJS.NodeJS.LTS -e` → `npm install -g @google/gemini-cli` → https://aistudio.google.com/apikey 에서 무료 키를 만들어 사장이 PowerShell에서 `[Environment]::SetEnvironmentVariable("GEMINI_API_KEY", "<키>", "User")`. Google 계정 로그인 방식은 개인 무료 사용이 막혀 안 됨. 무료 키는 pro 모델을 못 써서 flash가 기본(`GEMINI_MODEL`로 바꿈)
+2. **판단 규칙** (Codex·Gemini 같음):
+   - 각 지적이 실제로 맞는지 **코드를 직접 확인**해서 맞는 것만 고친다. 고치기 전에 회귀 테스트 먼저(`tests/test_review_fixes.*`), 고치기는 5회 루프("구현 루프" 6번).
+   - **두 곳 이상(qa-reviewer·Codex·Gemini)이 같은 문제를 지적하면 우선순위를 올린다.**
    - **심각도 '높음'인데 판단이 애매한 것은 고치지 말고 사장에게 먼저 묻는다.** (팀 안의 일은 묻지 않는다는 규칙의 예외)
-   - Claude 리뷰와 같은 걸 지적하면 우선순위를 높인다.
-4. **마무리**: 고친 뒤 테스트를 다시 돌려 깨진 게 없는지 확인한다. **리뷰는 1라운드만.** 고친 코드를 다시 Gemini에 돌리지 않는다. 6단계 QA 보고에 "반영한 지적 / 반영 안 한 지적(이유) / 사장 확인 필요한 것" 세 가지로 짧게 정리한다.
+   - 반영하지 않은 지적은 각 결과 파일(`review_codex.md`·`review_result.md`) 맨 아래 `## Claude 판단` 절에 지적마다 이유를 적는다.
+3. **마무리**: 고친 뒤 테스트를 다시 돌려 깨진 게 없는지 확인한다. **리뷰는 1라운드만.** 고친 코드를 다시 Codex·Gemini에 돌리지 않는다. 6단계 QA 보고에 `Codex: 반영 N / 미반영 N(이유) · Gemini: 반영 N / 미반영 N(이유) · 사장 확인 필요` 한 줄로 정리한다.
 
 ## 레드팀 공격 (6단계, QA 보고 전, 필수)
 코드를 읽는 리뷰(5단계)와 달리, **해커 입장에서 실행 중인 앱과 코드를 직접 공격**한다. "구멍이 최소 1개는 있다"고 보고 찾는다.
@@ -244,6 +280,10 @@ Claude가 처음 쓰는 사람처럼 앱을 직접 눌러 보며 테스트 목�
 | "Gemini가 안 깔려 있으니 교차 리뷰는 건너뛰자" | 교차 리뷰는 필수다. 설치·로그인을 부탁하고 될 때까지 5단계에 머문다 |
 | "Gemini가 높음이라 했으니 일단 고치자" | 맞는지 코드로 확인한다. 높음인데 애매하면 고치지 말고 사장에게 묻는다 |
 | "고쳤으니 Gemini에 한 번 더 돌려 보자" | 리뷰는 1라운드만. 다시 돌리지 않는다 |
+| "Gemini 리뷰를 했으니 Codex는 건너뛰자" (또는 반대) | 둘 다 필수. 없는 도구는 설치·로그인을 부탁하고 기다린다 |
+| "다 고쳐질 때까지 계속 돌리면 된다" | 15회(다시 고치기는 5회)·같은 실패 3회 연속이면 멈추고 사장에게 보고한다 |
+| "고쳤으니 HANDOFF에 완료라고 쓰자" | 사장에게 "해결됐어요 / 아직이에요"를 묻고 "해결됐어요"를 받은 뒤에만 |
+| "approve-tests.sh를 내가 돌리면 빠르다" | 승인은 사장만. 한 줄을 부탁한다 |
 | "사용자가 나가야 하니 리뷰는 다음에" | 리뷰에는 사용자가 필요 없다. 지금 돌린다. 정말 못 하면 "리뷰 남음"으로 보고한다 |
 | "테스트보다 내 방식이 낫다" | 테스트대로 만든다. 바꾸자는 의견은 질문으로 |
 | "테스트만 먼저 썼으니 3단계 끝에 커밋" | 지금은 전부 실패 상태다. 4단계 통과 후 함께 커밋한다 |

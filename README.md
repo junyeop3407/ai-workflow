@@ -14,11 +14,12 @@ Claude Code가 혼자 돌려서 앱을 만드는 작업장 견본입니다.
 |---|---|---|
 | `CLAUDE.md` | 프로젝트 소개, 자주 쓰는 명령, 역할, 팀별 기술 | 매 세션 항상 읽힘 → 짧을수록 잘 지킴 |
 | `.claude/rules/` | 보안·화면(웹+안드로이드·iOS)·테스트 규칙 | 파일 위에 경로를 적어 그 경로를 열 때만 불러짐 |
-| `.claude/skills/` | `/build-app`(앱 한 바퀴 + 단계별 스킬 표), `/handoff`(HANDOFF → 커밋 → 푸시) | 평소엔 설명 한 줄만, 쓸 때만 본문을 읽음 |
-| `.claude/hooks/` | 실패 상태 커밋·강제 푸시·비밀값 커밋 차단, 승인된 테스트 수정 시 사장 확인, 민감한 파일 수정 시 레드팀 다시 돌리기 표시 | Claude가 뭘 판단하든 동작 자체를 막음 |
-| `.claude/agents/` | `test-runner`, `qa-reviewer`, `red-team` | 자기 컨텍스트에서 일하고 요약만 돌려줘 메인 대화가 가벼움 |
+| `.claude/skills/` | `/build-app`(앱 한 바퀴 + 단계별 스킬 표 + `/goal` 구현 루프), `/handoff`(HANDOFF → 커밋 → 푸시), `/weekly-review`(반복된 실수 → 규칙 후보 최대 3개) | 평소엔 설명 한 줄만, 쓸 때만 본문을 읽음 |
+| `.claude/hooks/` | 실패 상태 커밋·강제 푸시·비밀값 커밋 차단, 승인된 테스트 잠금(사장만 잠금, 수정 시 확인 창, 어떤 방법으로 바꿔도 커밋 직전·응답 끝에 해시로 잡음), 민감한 파일 수정 시 레드팀 다시 돌리기 표시, 세션 시작 점검·주간 회고 알림. 시험: `bash .claude/hooks/test-hooks.sh --settings` | Claude가 뭘 판단하든 동작 자체를 막음 |
+| `.claude/agents/` | `test-runner`, `qa-reviewer`, `red-team` (뒤의 둘은 자주 나오는 문제를 `.claude/agent-memory/`에 쌓음 — 공개 저장소라 일반 패턴만, 앱별 증거·키는 안 적음) | 자기 컨텍스트에서 일하고 요약만 돌려줘 메인 대화가 가벼움 |
 
-- `/build-app` 순서: 질문 → 설계안 3개 → 테스트 목록 승인 → 구현 → 별도 리뷰 + **교차 리뷰**(Gemini, 필수) → 레드팀 → 확인·올리기
+- `/build-app` 순서: 질문 → 설계안 3개 → 테스트 목록 승인(사장이 잠금) → `/goal` 구현 루프(일지 `progress.md`, 15회·같은 실패 3회면 멈춤) → 별도 리뷰 + **교차 리뷰**(Codex·Gemini, 필수) → 레드팀 → 확인("해결됐어요 / 아직이에요")·올리기
+- 예약 작업은 쓰지 않습니다. 세션을 열 때 진행 중인 앱 테스트를 한 번 돌리고, 7일이 지났으면 주간 회고를 한 번 묻습니다.
 - 플러그인: superpowers, modern-web-guidance, context7, chrome-devtools-mcp, **ECC**(affaan-m/ECC — 시장조사·Spring·테스트 가이드, 빌드 에러 해결·언어별 리뷰 에이전트만 골라 씀, ECC 훅은 꺼 둠)
 - `HANDOFF.md`: 어느 컴퓨터에서든 여기서 이어서 시작
 - `setup/new-project/`: 어디서든 "새 프로젝트 만들어 줘"로 이 견본을 꺼내 쓰는 개인 스킬
@@ -44,7 +45,7 @@ junyeop3407/ai-workflow README 보고 이 컴퓨터 세팅해 줘
    → 파일 첫 줄이 `---`이고 `name: new-project`가 있는지 확인.
 6. **선택 (사용자에게 하나씩 묻기, 추천 붙여서)**:
    - 팀 기본 기술 도구(Java JDK, Node.js, Playwright 브라우저): 첫 앱을 만들 때 필요한 것만 깔아도 됨(추천: 지금은 건너뜀). 설치 명령은 HANDOFF.md "처음 쓰는 컴퓨터 준비" 6번.
-   - 교차 리뷰 도구(아래 "교차 리뷰" 절): Node.js + Gemini CLI. **교차 리뷰는 필수**라 첫 앱의 5단계 전에는 깔아야 함(추천: 지금 설치). Google AI Studio 무료 API 키 필요.
+   - 교차 리뷰 도구(아래 "교차 리뷰" 절): Node.js + Codex CLI + Gemini CLI. **교차 리뷰는 필수**라 첫 앱의 4단계 전에는 깔아야 함(추천: 지금 설치). Codex는 ChatGPT 계정 로그인, Gemini는 Google AI Studio 무료 API 키 필요.
 7. **이어서 하던 프로젝트가 있으면**: 사용자에게 저장소 이름을 묻고 `"$GH" repo clone junyeop3407/<이름>` → 그 폴더에서 `HANDOFF.md 읽고 이어서 해 줘`.
 8. **알려 주기** (짧게): 된 것 / 건너뛴 것, 그리고 사용법 — 아무 폴더에서 `/new-project 만들고 싶은 것`. `/new-project`가 목록에 안 보이면 Claude Code를 한 번 껐다 켠다.
 
@@ -64,13 +65,15 @@ Git Bash(또는 Mac 터미널)에서, GitHub 로그인(`gh auth login --web`) �
 GH=gh; command -v gh >/dev/null || GH="/c/Program Files/GitHub CLI/gh.exe"; mkdir -p ~/.claude/skills/new-project && "$GH" api repos/junyeop3407/ai-workflow/contents/setup/new-project/SKILL.md -H "Accept: application/vnd.github.raw" > ~/.claude/skills/new-project/SKILL.md
 ```
 
-## 교차 리뷰 (필수)
-5단계에서 Claude 리뷰에 더해 **Gemini CLI**에게 이번 작업의 변경분을 리뷰받습니다. 건너뛰지 않습니다(없으면 Claude가 설치를 부탁함).
-- 설치: Node.js `winget install --id OpenJS.NodeJS.LTS -e` → Gemini CLI `npm install -g @google/gemini-cli` → https://aistudio.google.com/apikey 에서 무료 API 키를 만들고 PowerShell에서 `[Environment]::SetEnvironmentVariable("GEMINI_API_KEY", "<키>", "User")` 실행 (Google 계정 로그인 방식은 개인 무료 사용이 막혀 안 됨. 무료 키는 flash 모델만 쓸 수 있어 스크립트가 flash를 기본으로 씀)
-- 실행: `bash .claude/skills/build-app/cross-review.sh apps/<앱> <리뷰 기준 커밋>` → `apps/<앱>/docs/review_result.md`
-- 변경분 + 변경된 파일 전체 + 그 파일을 import하는 파일을 묶어 보내고, 버그·보안·예외 처리 누락·성능만 심각도와 함께 지적받습니다.
-- Claude가 각 지적이 맞는지 코드로 확인해 반영합니다. 반영 안 한 지적은 이유를 남기고, 심각도 "높음"인데 애매하면 사장에게 먼저 묻습니다. 리뷰는 1라운드만.
-- 6단계 QA 보고에 "반영한 지적 / 반영 안 한 지적(이유) / 확인 필요한 것"으로 정리됩니다.
+## 교차 리뷰 (필수 — Codex + Gemini)
+만든 AI(Claude)와 다른 AI 두 곳에 검수받습니다. 둘 다 건너뛰지 않습니다(없으면 Claude가 설치·로그인을 부탁함).
+> ⚠ **앱 코드가 OpenAI(Codex)와 Google(Gemini) 서비스로 보내집니다.** `.env`·키 파일·`samples/`(실제 업무 파일)는 스크립트가 빼고 보냅니다.
+- **Codex 설치**: Node.js → `npm install -g @openai/codex` → `codex login`(브라우저에서 ChatGPT 계정 로그인). 검수는 읽기 전용 모드(`-s read-only`)로 빈 임시 폴더에서 돌아 파일을 고치지 못합니다.
+- **Gemini 설치**: Node.js `winget install --id OpenJS.NodeJS.LTS -e` → `npm install -g @google/gemini-cli` → https://aistudio.google.com/apikey 에서 무료 API 키를 만들고 PowerShell에서 `[Environment]::SetEnvironmentVariable("GEMINI_API_KEY", "<키>", "User")` 실행 (Google 계정 로그인 방식은 개인 무료 사용이 막혀 안 됨. 무료 키는 flash 모델만 쓸 수 있어 스크립트가 flash를 기본으로 씀)
+- 실행: `bash .claude/skills/build-app/cross-review.sh apps/<앱> <기준> [codex|gemini]` → Codex `docs/review_codex.md`, Gemini `docs/review_result.md`
+- 언제: 4단계에서 계획의 단계 하나가 통과할 때마다 Codex로 그 단계만 빠르게, 5단계에서 qa-reviewer(Claude) → Codex → Gemini 순서로 전체. 각 1라운드.
+- Claude가 각 지적이 맞는지 코드로 확인해 맞는 것만 고칩니다(회귀 테스트 먼저). 두 곳 이상이 같은 문제를 지적하면 먼저 고치고, 심각도 "높음"인데 애매하면 사장에게 묻습니다. 반영 안 한 지적은 결과 파일 맨 아래 "Claude 판단"에 이유를 남깁니다.
+- 6단계 QA 보고에 "Codex: 반영 N / 미반영 N(이유) · Gemini: 반영 N / 미반영 N(이유) · 사장 확인 필요"로 정리됩니다.
 
 ## 사장이 하는 일 (모든 팀의 결과물을 검토)
 | 언제 | 팀 | 할 일 |

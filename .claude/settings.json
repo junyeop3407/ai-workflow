@@ -32,6 +32,25 @@
           {
             "type": "command",
             "shell": "bash",
+            "command": "bash \"$CLAUDE_PROJECT_DIR/.claude/hooks/protect-tests.sh\"",
+            "timeout": 10
+          },
+          {
+            "type": "command",
+            "shell": "bash",
+            "command": "bash \"$CLAUDE_PROJECT_DIR/.claude/hooks/check-approved.sh\" commit",
+            "timeout": 30,
+            "statusMessage": "승인된 테스트가 그대로인지 확인 중..."
+          },
+          {
+            "type": "command",
+            "shell": "bash",
+            "command": "bash \"$CLAUDE_PROJECT_DIR/.claude/hooks/flag-redteam.sh\" commit",
+            "timeout": 30
+          },
+          {
+            "type": "command",
+            "shell": "bash",
             "command": "bash \"$CLAUDE_PROJECT_DIR/.claude/hooks/check-tests.sh\" commit",
             "timeout": 300,
             "statusMessage": "커밋 전 테스트 확인 중..."
@@ -45,6 +64,17 @@
             "type": "command",
             "shell": "bash",
             "command": "bash \"$CLAUDE_PROJECT_DIR/.claude/hooks/protect-tests.sh\"",
+            "timeout": 10
+          }
+        ]
+      },
+      {
+        "matcher": "Edit|Write|MultiEdit|NotebookEdit",
+        "hooks": [
+          {
+            "type": "command",
+            "shell": "bash",
+            "command": "bash \"$CLAUDE_PROJECT_DIR/.claude/hooks/agent-memory-only.sh\"",
             "timeout": 10
           }
         ]
@@ -72,6 +102,25 @@
             "command": "bash \"$CLAUDE_PROJECT_DIR/.claude/hooks/check-tests.sh\" stop",
             "timeout": 300,
             "statusMessage": "테스트 확인 중..."
+          },
+          {
+            "type": "command",
+            "shell": "bash",
+            "command": "bash \"$CLAUDE_PROJECT_DIR/.claude/hooks/check-approved.sh\" stop",
+            "timeout": 30
+          }
+        ]
+      }
+    ],
+    "SessionStart": [
+      {
+        "matcher": "startup",
+        "hooks": [
+          {
+            "type": "command",
+            "shell": "bash",
+            "command": "bash \"$CLAUDE_PROJECT_DIR/.claude/hooks/session-start.sh\"",
+            "timeout": 30
           }
         ]
       }
