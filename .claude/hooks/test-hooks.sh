@@ -21,6 +21,7 @@ row() { # 경우, 기대, 실제
 | $(printf '%s' "$1" | sed 's/|/\\|/g') | $2 | $3 | $mark |"
 }
 jesc() { printf '%s' "$1" | sed 's/\\/\\\\/g; s/"/\\"/g'; }
+bash_json_raw() { printf '{"session_id":"t","hook_event_name":"PreToolUse","tool_name":"Bash","tool_input":{"command":"%s","description":"x"}}' "$1"; }  # JSON 이스케이프(\n 등)를 그대로 넣음
 bash_json()  { printf '{"session_id":"t","hook_event_name":"PreToolUse","tool_name":"Bash","tool_input":{"command":"%s","description":"x"}}' "$(jesc "$1")"; }
 write_json() { printf '{"session_id":"t","hook_event_name":"PreToolUse","tool_name":"Write","tool_input":{"file_path":"%s","content":"%s"}}' "$(jesc "$1")" "$(jesc "$2")"; }
 edit_json()  { printf '{"session_id":"t","hook_event_name":"PreToolUse","tool_name":"Edit","tool_input":{"file_path":"%s","old_string":"a","new_string":"%s"}}' "$(jesc "$1")" "$(jesc "$2")"; }
@@ -82,6 +83,16 @@ row "git add a && bash .claude/hooks/approve-tests.sh apps/x" 막힘 "$(run "$(b
 row "git commit -m \"x\" ; rm apps/x/tests/.approved" 막힘 "$(run "$(bash_json "git commit -m \"x\" ; rm apps/x/tests/.approved")" protect-tests.sh)"
 row "git commit -m \"\$(bash approve-tests.sh)\"" 막힘 "$(run "$(bash_json "git commit -m \"\$(bash approve-tests.sh)\"")" protect-tests.sh)"
 row "cp x apps/x/tests/.approved / mv x …/.approved" 막힘 "$(run "$(bash_json "cp x apps/x/tests/.approved")" protect-tests.sh)"
+row "(우회) git log '-m \"' ; rm …/.approved ; git log '\"'" 막힘 "$(run "$(bash_json "git log '-m \"' ; rm apps/x/tests/.approved ; git log '\"'")" protect-tests.sh)"
+row "(우회) git commit -m \"a\\\" ; rm …/.approved\" (따옴표 안 글자)" 통과 "$(run "$(bash_json "git commit -m \"a\\\" ; rm apps/x/tests/.approved\"")" protect-tests.sh)"
+row "(우회) 줄바꿈으로 붙인 rm (cat …\\nrm …/.approved)" 막힘 "$(run "$(bash_json_raw 'cat apps/x/tests/.approved\nrm apps/x/tests/.approved')" protect-tests.sh)"
+row "(우회) \\; 로 숨긴 것: cat a\\; rm …/.approved" 막힘 "$(run "$(bash_json "cat a\\; rm apps/x/tests/.approved")" protect-tests.sh)"
+row "(우회) \$'…' 따옴표" 막힘 "$(run "$(bash_json "git log \$'x\\'' ; rm apps/x/tests/.approved")" protect-tests.sh)"
+row "(우회) 닫히지 않은 따옴표" 막힘 "$(run "$(bash_json "git commit -m \"x ; rm apps/x/tests/.approved")" protect-tests.sh)"
+row "(우회) 따옴표 안 --output: git diff '--output=…/.approved'" 막힘 "$(run "$(bash_json "git diff '--output=apps/x/tests/.approved'")" protect-tests.sh)"
+row "(우회) JSON 잘림: cat … ; git log \",\"a\": ; rm …/.approved" 막힘 "$(run "$(bash_json "cat apps/x/tests/.approved ; git log \",\"a\": ; rm apps/x/tests/.approved")" protect-tests.sh)"
+bs="$(printf '\134')"   # 역슬래시 (파일 편집 도구가 유니코드 이스케이프를 풀어 버리지 않게 실행할 때 만듦)
+row "(우회) 유니코드 이스케이프(u0027)로 따옴표 숨기기" 막힘 "$(run "$(bash_json_raw "git log ${bs}u0027x${bs}u0027 ; cat apps/x/tests/.approved")" protect-tests.sh)"
 row "git add .approved > out.txt (리디렉션)" 막힘 "$(run "$(bash_json "git add apps/x/tests/.approved > out.txt")" protect-tests.sh)"
 
 # ---- 1. 해시 검사 (check-approved.sh) ----

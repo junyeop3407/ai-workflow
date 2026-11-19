@@ -31,26 +31,52 @@ block() {
 
 # ---- Bash / PowerShell ----
 if [ "$tool" = "Bash" ] || [ "$tool" = "PowerShell" ]; then
-  cmd="$(printf '%s' "$input" | tr '\n' ' ' | sed -n 's/.*"command"[[:space:]]*:[[:space:]]*"//p' \
-    | sed 's/"[[:space:]]*,[[:space:]]*"[a-z_]*"[[:space:]]*:.*//; s/"[[:space:]]*}.*//' | sed 's/\\"/"/g; s/\\\\/\\/g')"
+  # JSON에서 command 값을 끝 따옴표까지 제대로 읽고 이스케이프를 푼다(\n → 줄바꿈 등).
+  # \uXXXX 이스케이프가 있으면 셸이 보는 글자와 달라질 수 있어 BAD로 표시한다.
+  cmd="$(printf '%s' "$input" | awk 'BEGIN{RS="\001"} {
+    s=$0; p=index(s, "\"command\""); if (!p) exit
+    s=substr(s, p+9); if (!match(s, /^[ \t\r\n]*:[ \t\r\n]*"/)) exit
+    s=substr(s, RLENGTH+1); n=length(s); out=""
+    for (i=1; i<=n; i++) {
+      ch=substr(s,i,1)
+      if (ch=="\\") { i++; e=substr(s,i,1)
+        if (e=="n") out=out "\n"; else if (e=="t") out=out "\t"; else if (e=="r") ;
+        else if (e=="u") { out=out "\001BAD"; i+=4 } else out=out e
+        continue }
+      if (ch=="\"") break
+      out=out ch
+    }
+    printf "%s", out }')"
   printf '%s' "$cmd" | grep -Eq 'approve-tests|\.approved' || exit 0
 
-  # 읽기만 하는 명령(+ git add / git commit -m)인지
+  # 읽기만 하는 명령(+ git add / git commit)인지
   readonly_ok() {
-    local c="$1"
-    # 명령 치환은 메시지 안에 있어도 실행되므로 먼저 막는다
-    printf '%s' "$c" | grep -Eq '\$\(|`' && return 1
-    # git commit -m "<메시지>" / -m '<메시지>' 의 메시지는 글자일 뿐이라 지우고 본다
-    # (메시지 안의 ; && | > approve-tests .approved 때문에 막히지 않게. 메시지 밖은 그대로 검사)
-    c="$(printf '%s' "$c" | sed -E "s/(-[a-zA-Z]*m|--message)(=|[[:space:]]+)\"([^\"\\\\]|\\\\.)*\"/-m MSG/g; s/(-[a-zA-Z]*m|--message)(=|[[:space:]]+)'[^']*'/-m MSG/g")"
-    # tee·파일로 내보내는 옵션은 읽기가 아님
-    printf '%s' "$c" | grep -Eq '(^|[^A-Za-z])tee([^A-Za-z]|$)|--output' && return 1
-    # 2>&1, >/dev/null 은 무해하니 지우고, 그래도 > 가 남으면 쓰기
+    local c="$1" segs seg
+    printf '%s' "$c" | grep -q "$(printf '\001')BAD" && return 1
+    # 따옴표 안이어도 실행되거나 파일을 쓰는 것: 명령 치환, $'..', 파일로 내보내는 옵션
+    printf '%s' "$c" | grep -Eq "\\$\(|\`|\\$'|--output" && return 1
+    # 셸과 같은 규칙으로 따옴표 안 글자를 Q로 바꾼다(작은따옴표: 이스케이프 없음 / 큰따옴표: \ 이스케이프).
+    # 따옴표 밖의 \ (예: \; ) 나 닫히지 않은 따옴표가 있으면 읽기로 보지 않는다.
+    # → 커밋 메시지 안의 ; && | > approve-tests .approved 때문에 막히지 않고, 메시지 밖은 그대로 검사된다.
+    c="$(printf '%s' "$c" | awk 'BEGIN{RS="\001"} {
+      s=$0; n=length(s); out=""; q=""; bad=0
+      for (i=1; i<=n; i++) {
+        ch=substr(s,i,1)
+        if (q=="") {
+          if (ch=="\\") { bad=1; continue }
+          if (ch=="\047") { q="s"; out=out "Q"; continue }
+          if (ch=="\"") { q="d"; out=out "Q"; continue }
+          out=out ch
+        } else if (q=="s") { if (ch=="\047") q="" }
+        else { if (ch=="\\") { i++; continue } if (ch=="\"") q="" }
+      }
+      if (q!="" || bad) exit 1
+      printf "%s", out }')" || return 1
+    # 2>&1, >/dev/null 은 무해하니 지우고, 그래도 > 나 <( 가 남으면 쓰기·실행
     c="$(printf '%s' "$c" | sed -E 's/[0-9]*>&[0-9]+//g; s#[0-9]*>>?[[:space:]]*/dev/null##g')"
-    printf '%s' "$c" | grep -q '>' && return 1
-    # 줄바꿈(JSON의 \n)·; · && · || · | · & 로 나눈 조각이 모두 허용된 읽기 명령이어야 한다
-    local segs
-    segs="$(printf '%s' "$c" | sed -E 's/\\n/\n/g; s/(\|\||&&|;|\||&)/\n/g')"
+    printf '%s' "$c" | grep -Eq '>|<\(' && return 1
+    # 줄바꿈 · ; · && · || · | · & 로 나눈 조각이 모두 허용된 명령이어야 한다
+    segs="$(printf '%s' "$c" | sed -E 's/(\|\||&&|;|\||&)/\n/g')"
     while IFS= read -r seg; do
       seg="$(printf '%s' "$seg" | sed -E 's/^[[:space:]]+//; s/[[:space:]]+$//')"
       [ -z "$seg" ] && continue
@@ -61,7 +87,7 @@ if [ "$tool" = "Bash" ] || [ "$tool" = "PowerShell" ]; then
     return 0
   }
   readonly_ok "$cmd" && exit 0
-  block "명령에 approve-tests 또는 .approved 가 들어 있습니다(읽기 전용 명령이 아님): $cmd"
+  block "명령에 approve-tests 또는 .approved 가 들어 있습니다(읽기 전용 명령이 아님): $(printf '%s' "$cmd" | tr '\n\001' '  ' | cut -c1-300)"
 fi
 
 # ---- Edit / Write / MultiEdit ----
