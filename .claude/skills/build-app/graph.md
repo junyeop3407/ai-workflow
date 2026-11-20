@@ -80,11 +80,11 @@ flowchart TD
 | ok-dd | ★데이터·API 검토 | 사람 | 사장 | data.md, api.md | 승인 기록 | approve | - | bb | - | - | dd | - | 서버 없음 | 4 |
 | bb | 백엔드 구현 | AI+프로그램 | 백엔드팀 + 자동 루프(ecc:springboot-*) | plan.md, api.md | 서버 코드, JUnit, tests/backend.sh, docs/progress.md | 백엔드 테스트 줄 통과 | backend | cb | tr | ok-ui,ok-dd | - | 5 | 서버 없음 | 4 |
 | cb | Codex 빠른 검수(백엔드) | 외부AI | Codex(cross-review.sh) | 그 plan 단계 변경분 | docs/review_codex.md | 맞는 지적 없음(1라운드) | - | bb,bf | - | - | bb | - | 서버 없음 | 4 |
-| bf | 프론트 구현 | AI+프로그램 | 프론트팀 + 자동 루프(modern-web-guidance·context7·ponytail) | plan.md, api.md, DESIGN.md | 화면 코드, docs/progress.md | 테스트 실행 줄 통과 + 해시 일치 | tests | cf | tr | ok-ui,ok-dd | - | 5 | - | 4 |
+| bf | 프론트 구현 | AI+프로그램 | 프론트팀 + 자동 루프(modern-web-guidance·context7·ponytail) | plan.md, api.md, DESIGN.md | 화면 코드, docs/progress.md | 테스트 실행 줄 통과 + 개수(통과 ≥ 승인·건너뜀 0) + 해시 일치 | tests | cf | tr | ok-ui,ok-dd | - | 5 | - | 4 |
 | cf | Codex 빠른 검수(프론트) | 외부AI | Codex(cross-review.sh) | 그 plan 단계 변경분 | docs/review_codex.md | 맞는 지적 없음(1라운드) | - | bf,ug | - | - | bf | - | - | 4 |
 | ug | 화면 점검 | AI | web-design-guidelines, break-ui | 실행 중인 앱(localhost) | docs/ui-check.md | 맞는 지적 해결(근거 줄) | - | tr | - | - | bf,ui | 3 | 화면 없음 | 5 |
-| tr | 테스트 | 프로그램 | graph.sh | 테스트 실행 줄 | docs/test-log.txt | 전체 통과 + 해시 일치 | tests | qa | - | - | bf,bb | - | - | 5 |
-| qa | 리뷰 | AI | qa-reviewer + ecc:react-reviewer·ecc:java-reviewer + code-review | 앱 폴더, docs/tests.md | docs/review.md | 맞는 지적 해결(1라운드) | - | cx | - | - | bf,bb,ui | 3 | - | 5 |
+| tr | 테스트 | 프로그램 | graph.sh | 테스트 실행 줄 | docs/test-log.txt | 전체 통과 + 개수(통과 ≥ 승인·건너뜀 0) + 해시 일치 | tests | qa | - | - | bf,bb | - | - | 5 |
+| qa | 리뷰 | AI | qa-reviewer + ecc:react-reviewer·ecc:java-reviewer + code-review | 앱 폴더, docs/tests.md | docs/review.md | 맞는 지적 해결(1라운드) + 바뀐 준비 코드 리뷰(아래) | - | cx | - | - | bf,bb,ui | 3 | - | 5 |
 | cx | Codex 교차 검수 | 외부AI | Codex(cross-review.sh) | 리뷰 기준~지금 | docs/review_codex.md | 맞는 지적 해결(1라운드) | - | gm | - | - | bf,bb,ui | 3 | - | 5 |
 | gm | Gemini 교차 검수 | 외부AI | Gemini(cross-review.sh) | 리뷰 기준~지금 | docs/review_result.md | 맞는 지적 해결(1라운드) | - | dv | - | - | bf,bb,ui | 3 | - | 5 |
 | dv | DevTools·부하 점검 | 프로그램 | graph.sh(측정은 chrome-devtools MCP·부하 도구) | 실행 중인 앱(localhost) | docs/perf.txt | 수치 기준(아래) | perf | ex | - | - | bf,bb | 3 | 화면·서버 둘 다 없음 | 6 |
@@ -160,6 +160,31 @@ flowchart TD
 | 20 | 동시 50명 부하 에러 0%·응답 99% 1초 이하 | dv⚙️ | bb |
 <!-- checklist:end -->
 
+## pass 할 때 graph.sh가 더 보는 것
+**다음 노드**: `pass <노드> <다음>`의 `<다음>`은 노드 표 '다음' 칸에 있어야 한다. 없으면(없는 노드, 다른 노드의 다음) 무시하지 않고 거부한다.
+
+**내는 것**(종류 AI·AI+프로그램·외부AI 노드): '내는 것' 칸에서 **파일로 보는 것** = 공백이 없고 `/` 또는 `.확장자`가 든 것(앱 폴더 기준). 파일은 있고 비어 있지 않아야(공백만 있으면 빈 것), `/`로 끝나면 폴더 안에 빈 파일이 아닌 것이 1개 이상. **확인하지 않는 것** = 공백이 든 설명 말(승인 기록, 서버 코드, 화면 코드, 공개 주소, HANDOFF 테스트 실행 줄, state.json score)과 확장자 없는 낱말(JUnit). ★·프로그램 노드는 이 확인을 하지 않는다(⚙️ 검사가 따로 있음). 자동 루프(bb·bf)도 테스트 통과 뒤 이 확인을 넘어야 다음 노드로 간다.
+
+**건너뛰기 연쇄**: `skip`으로 한 노드를 건너뛰면 '건너뛰기' 칸이 **같은 글자**인 노드를 모두 함께 건너뛴다 — "서버 없음" = dd·ok-dd·bb·cb, "화면 없음" = ui·ok-ui·ug. 이미 통과한 노드가 그 안에 있으면 거부(앱 모양이 중간에 바뀐 것이라 사장에게 묻기).
+
+**테스트 개수 읽기**(bf·tr 검사, sc 필수 관문): 테스트 실행 줄이 성공(exit 0)해도 출력에서 개수를 읽어 **통과 수 ≥ 승인된 테스트 수, 건너뜀 0, 실패 0, 0개 아님**일 때만 통과. **개수를 못 읽으면 통과로 치지 않는다**(`run.sh`를 `exit 0`으로 바꾸는 위조 차단).
+- 승인된 테스트 수 = 잠긴 파일 안의 테스트 정의 수(`check-approved.sh count`): JS·TS `test('…')`·`it('…')`(+`.only`·`.fixme`·`.fail`·`.concurrent`), Python `def test_…`, Java·Kotlin `@Test`·`@ParameterizedTest`·`@RepeatedTest`. Playwright가 브라우저 3개에서 돌면 통과 수가 3배라 ≥로 비교한다.
+- 읽는 줄(도구마다 마지막 합계, 여러 도구면 더함 — 확인: `… | bash .claude/skills/build-app/graph.sh tcount`):
+
+| 도구 | 읽는 줄 | 건너뜀으로 세는 것 |
+|---|---|---|
+| Playwright | `  3 passed (2.1s)` · `  1 skipped` · `  1 failed` (앞에 띄어쓰기) | skipped, did not run, interrupted (flaky는 실패) |
+| Vitest | `Tests  2 passed \| 1 skipped (3)` | skipped, todo |
+| Jest | `Tests:  1 skipped, 2 passed, 3 total` | skipped, todo |
+| pytest | `=== 4 passed, 1 skipped in 0.12s ===`, `-q`면 `2 passed in 0.01s` | skipped, deselected, xfailed |
+| JUnit(Maven) | 마지막 `Tests run: 6, Failures: 0, Errors: 0, Skipped: 1` | Skipped |
+| JUnit(Gradle) | 테스트마다 `ItemTest > create() PASSED` — `build.gradle`에 `test { testLogging { events "passed", "skipped", "failed" } }` 필요(기본 Gradle은 개수를 안 찍음) | SKIPPED |
+| node --test | `ℹ pass 3` · `ℹ skipped 1` (TAP는 `# pass 3`) | skipped, todo, cancelled |
+
+- 남은 위험: `run.sh`가 합계 줄을 `echo`로 꾸며 찍으면 graph.sh는 못 가린다 → 아래 "준비 코드 리뷰"로 qa가 그 diff를 반드시 본다.
+
+**준비 코드 리뷰**(qa): 준비 코드 = `tests/` 안에서 잠기지 않은 파일(`run.sh`·`conftest.py`·`fixtures/`·`helpers/`·`backend.sh` 등) + 앱 안의 `playwright.config.*`·`vitest.config.*`·`conftest.py`·`pytest.ini`. 지금처럼 고칠 수 있다. graph.sh가 잠금 때와 qa 통과 때 해시를 state.json `prep`에 남기고, qa를 pass할 때 그 뒤 **바뀐·생긴·지운** 준비 코드마다 `docs/review.md`의 `## 준비 코드 변경` 절에 `- <앱 폴더 기준 경로> — 괜찮음|문제: <이유>` 줄이 있어야 통과(기록이 없는 앱은 첫 qa에서 준비 코드 전부). 테스트를 약하게 만드는 변경(검사 건너뛰기·합계 꾸미기·기다리는 시간으로 실패 가리기)은 `[맞음]` 지적으로 올린다.
+
 ## 파일 형식 (graph.sh가 읽는 것)
 **api.md 예시**(bb 검사, `.claude/skills/build-app/api-check.sh`): 예시마다 아래 세 줄 묶음. `"<아무거나>"`는 키만 확인.
 ````
@@ -180,7 +205,7 @@ flowchart TD
 **근거 규칙**: AI 판단이 들어간 항목(체크리스트·리뷰 해결)은 `근거:`/`해결:`의 파일과 줄이 실제로 있어야 ✓. 없으면 ✗로 센다.
 
 ## 완성도 점수 (sc, `graph.sh score`)
-1. **필수 관문**(하나라도 실패 → 점수 전에 담당 노드로 자동 fail): 승인 테스트 100%(bf), 잠금 해시 일치(②), 비밀값 검사 0(bb, 서버 없으면 bf), redteam.md에 해결 안 된 `[뚫림] [심각]` 0(bb, 서버 없으면 bf), `.redteam-needed` 없음(rt).
+1. **필수 관문**(하나라도 실패 → 점수 전에 담당 노드로 자동 fail): 승인 테스트 100% + 개수 확인(통과 ≥ 승인·건너뜀 0, 못 읽으면 실패)(bf), 잠금 해시 일치(②), 비밀값 검사 0(bb, 서버 없으면 bf), redteam.md에 해결 안 된 `[뚫림] [심각]` 0(bb, 서버 없으면 bf), `.redteam-needed` 없음(rt).
 2. **점수** = 해당 항목 중 ✓ / 해당 항목 수(해당 없음 제외). 항목: 체크리스트 20개 · 리뷰 4곳 `[맞음]` 지적 · ug 지적 · perf 수치 · 꼭 되어야 할 기능.
 3. 90% 이상 → ok-qa(★): 점수·항목별 ✓/✗·남은 10%와 추천·`ask-later.md`를 한 번에 보고. 90% 미만 → ✗를 담당 노드별로 모아 가장 많이 깎은 노드로 자동 fail → 고친 뒤 tr → sc 다시.
 4. 브레이크: 점수 5바퀴 초과 또는 2바퀴 연속 점수가 안 오름 → ②.

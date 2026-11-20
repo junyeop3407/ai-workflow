@@ -110,7 +110,7 @@ parse_state() {
       if (k == "  Q: N,") { strs($0); nums($0); if (S[1]!="version" || N[1]!="1") bad("version"); kv("version", 1); seen["version"]=1; next }
       if (k == "  Q: [],") { strs($0); if (S[1]=="approvals") { seen["approvals"]=1; next } }
       if (k ~ /^  Q: \[(Q(, Q)*)?\],$/) { strs($0); if (S[1]!="current" && S[1]!="queue") bad("목록 키"); kv(S[1], lst($0)); seen[S[1]]=1; next }
-      if (k == "  Q: Q,") { strs($0); if (S[1]!="app" && S[1]!="resume" && S[1]!="ex_budget") bad("키 " S[1]); kv(S[1], S[2]); seen[S[1]]=1; next }
+      if (k == "  Q: Q,") { strs($0); if (S[1]!="app" && S[1]!="resume" && S[1]!="ex_budget" && S[1]!="prep") bad("키 " S[1]); kv(S[1], S[2]); seen[S[1]]=1; next }
       if (k == "  Q: {Q: Q, Q: Q, Q: Q},") { strs($0); if (S[1]!="wait") bad("wait"); kv("wait.node", S[3]); kv("wait.kind", S[5]); kv("wait.line", S[7]); seen["wait"]=1; next }
       if (k == "  Q: {Q: Q, Q: Q, Q: Q, Q: Q},") { strs($0); if (S[1]!="last_fail") bad("last_fail"); kv("lf.from", S[3]); kv("lf.to", S[5]); kv("lf.reason", S[7]); kv("lf.at", S[9]); seen["last_fail"]=1; next }
       if (k == "  Q: {Q: N, Q: Q, Q: Q},") { strs($0); nums($0); if (S[1]!="score") bad("score"); kv("score.rounds", N[1]); kv("score.history", S[4]); kv("score.last", S[6]); seen["score"]=1; next }
@@ -156,6 +156,7 @@ write_state() {
     echo "  \"wait\": {\"node\": \"$(kget wait.node)\", \"kind\": \"$(kget wait.kind)\", \"line\": \"$(kget wait.line)\"},"
     echo "  \"last_fail\": {\"from\": \"$(kget lf.from)\", \"to\": \"$(kget lf.to)\", \"reason\": \"$(kget lf.reason)\", \"at\": \"$(kget lf.at)\"},"
     echo "  \"ex_budget\": \"$(kget ex_budget)\","
+    [ -n "$(kget prep)" ] && echo "  \"prep\": \"$(kget prep | tr -d '"\\')\","   # 준비 코드 기록(없을 수 있음)
     n="$(kget score.rounds)"
     echo "  \"score\": {\"rounds\": ${n:-0}, \"history\": \"$(kget score.history)\", \"last\": \"$(kget score.last)\"},"
     echo "  \"nodes\": {"
@@ -206,6 +207,108 @@ run_tests() { # [백엔드]
   TEST_OUT="$out"
   return $rc
 }
+# 테스트 실행 결과(표준 입력)에서 개수 읽기 → "통과 N 건너뜀 N 실패 N 형식 N" (형식 = 읽은 도구 수, 0이면 못 읽음)
+# 도구마다 마지막 합계 줄을 쓰고(Gradle은 줄마다 셈), 여러 도구면 더한다. 규칙은 graph.md "테스트 개수 읽기".
+tcount_parse() {
+  tr -d '\r' | awk '
+    function add(kind, n) { if (kind ~ /^pass/ || kind=="xpassed") return "P"; if (kind ~ /^(skip|todo|deselected|xfailed|did not run|interrupted|cancelled)/) return "S"; if (kind ~ /^(fail|error|flaky)/) return "F"; return "" }
+    function parts(s, fmt,   n, i, a, m, k) { delete C; n=split(s, a, /[,|]/)
+      for (i=1; i<=n; i++) if (match(a[i], /[0-9]+ [a-z][a-z ]*[a-z]/)) { m=substr(a[i], RSTART, RLENGTH); k=add(substr(m, index(m, " ")+1)); if (k!="") C[k]+=substr(m, 1, index(m, " ")-1) }
+      seen[fmt]=1; P[fmt]=C["P"]+0; S[fmt]=C["S"]+0; F[fmt]=C["F"]+0 }
+    { gsub(/\033\[[0-9;]*m/, "") }
+    /^[ \t]+[0-9]+ (passed|skipped|failed|flaky|did not run|interrupted)( \(.*\))?[ \t]*$/ {   # Playwright
+      if (!pwnew) { pwP=pwS=pwF=0; pwnew=1 } n=$1+0; k=add(substr($0, index($0, $1)+length($1)+1))
+      if (k=="P") pwP=n; else if (k=="S") pwS=n; else if (k=="F") pwF=n
+      seen["pw"]=1; P["pw"]=pwP; S["pw"]=pwS; F["pw"]=pwF; next }
+    { pwnew=0 }
+    /^[ \t]*Tests[ \t]+[0-9].*\([0-9]+\)[ \t]*$/ { parts($0, "vitest"); next }               # Vitest
+    /^Tests:[ \t]+[0-9]/ { s=$0; sub(/, [0-9]+ total.*/, "", s); parts(s, "jest"); next }     # Jest
+    /^=+ .*[0-9]+ (passed|failed|skipped|error|errors|deselected|xfailed|xpassed).* in [0-9.]+s.*=+[ \t]*$/ || /^[0-9]+ (passed|failed|skipped|error|errors|deselected|xfailed|xpassed)/ {
+      s=$0; sub(/ in [0-9.]+s.*/, "", s); gsub(/=/, "", s); parts(s, "pytest"); next }        # pytest
+    match($0, /Tests run: [0-9]+, Failures: [0-9]+, Errors: [0-9]+, Skipped: [0-9]+/) {       # JUnit(Maven)
+      split(substr($0, RSTART, RLENGTH), a, /[^0-9]+/); seen["mvn"]=1
+      P["mvn"]=a[2]-a[3]-a[4]-a[5]; S["mvn"]=a[5]; F["mvn"]=a[3]+a[4]; next }
+    / > .+ (PASSED|SKIPPED|FAILED)[ \t]*$/ { seen["gradle"]=1                                 # JUnit(Gradle testLogging)
+      if ($NF=="PASSED") P["gradle"]++; else if ($NF=="SKIPPED") S["gradle"]++; else F["gradle"]++; next }
+    /^(#|ℹ) (pass|fail|skipped|todo|cancelled) [0-9]+[ \t]*$/ { seen["node"]=1; k=add($2)     # node --test
+      if (k=="P") P["node"]=$3; else if (k=="S") S["node"]+=$3; else F["node"]+=$3; next }
+    END { for (f in seen) { totP+=P[f]; totS+=S[f]; totF+=F[f]; totN++ }
+      printf "통과 %d 건너뜀 %d 실패 %d 형식 %d\n", totP, totS, totF, totN }'
+}
+# 통과한 테스트 수 ≥ 승인된 테스트 수, 건너뜀 0, 실패 0, 0개 아님. 개수를 못 읽으면 통과 아님
+count_ok() {
+  local c p s f k a
+  c="$(printf '%s\n' "$TEST_OUT" | tcount_parse)"; set -- $c; p=$2; s=$4; f=$6; k=$8
+  a="$(bash "$HOOKS/check-approved.sh" count "$APPDIR" </dev/null 2>/dev/null)"; a="${a:-0}"
+  COUNT_MSG=""
+  if [ "$k" = 0 ]; then COUNT_MSG="테스트 개수를 못 읽었습니다(통과로 치지 않음). 테스트 도구의 합계 줄이 출력에 나와야 합니다 — graph.md '테스트 개수 읽기'"
+  elif [ "$f" -gt 0 ]; then COUNT_MSG="실패한 테스트 ${f}개"
+  elif [ "$s" -gt 0 ]; then COUNT_MSG="건너뜀(skipped) ${s}개 — 건너뛴 테스트가 있으면 통과가 아닙니다"
+  elif [ "$p" -eq 0 ]; then COUNT_MSG="통과한 테스트가 0개입니다"
+  elif [ "$p" -lt "$a" ]; then COUNT_MSG="통과 ${p}개 < 승인된 테스트 ${a}개 — 승인된 테스트가 다 돌지 않았습니다"
+  fi
+  [ -z "$COUNT_MSG" ] && return 0
+  COUNT_MSG="$COUNT_MSG (읽은 개수: $c, 승인된 테스트 $a개)"; return 1
+}
+tests_ok() { # 테스트 실행 줄 통과 + 개수 확인. 실패면 TESTS_MSG
+  if ! run_tests; then TESTS_MSG="테스트 실패:
+$(printf '%s\n' "$TEST_OUT" | tail -n 15)"; return 1; fi
+  count_ok || { TESTS_MSG="테스트 개수 확인 실패: $COUNT_MSG"; return 1; }
+}
+
+# AI 노드 "내는 것" 칸: 파일(공백 없이 / 또는 .확장자가 있는 것)은 있고 비어 있지 않아야, / 로 끝나면 폴더 안에 빈 파일이 아닌 것 1개 이상.
+# 그 밖(승인 기록·서버 코드·공개 주소처럼 설명 말)은 확인하지 않는다. 종류 AI·AI+프로그램·외부AI 노드만.
+outputs_ok() {
+  local id="$1" item miss=""
+  case "$(nf "$id" 3)" in AI|AI+프로그램|외부AI) ;; *) return 0 ;; esac
+  OUT_MSG=""
+  while IFS= read -r item; do
+    item="$(printf '%s' "$item" | sed 's/^[[:space:]]*//; s/[[:space:]]*$//')"
+    printf '%s' "$item" | grep -Eq '^[A-Za-z0-9_./-]+$' || continue
+    case "$item" in */) ;; */*|*.*) ;; *) continue ;; esac
+    case "$item" in
+      */) [ -n "$(find "$APPDIR/$item" -type f -size +0 2>/dev/null | head -n1)" ] || miss="$miss $item(빈 폴더 또는 없음)" ;;
+      *) if [ ! -f "$APPDIR/$item" ]; then miss="$miss $item(없음)"
+         elif ! grep -q '[^[:space:]]' "$APPDIR/$item" 2>/dev/null; then miss="$miss $item(비어 있음)"; fi ;;
+    esac
+  done <<< "$(nf "$id" 6 | tr ',' '\n')"
+  [ -z "$miss" ] && return 0
+  OUT_MSG="내는 것이 없습니다:$miss (앱 폴더 기준, graph.md 노드 표 '내는 것')"; return 1
+}
+
+# 준비 코드: tests/ 안에서 잠기지 않은 파일 + 앱 안의 playwright.config.*·vitest.config.*·conftest.py·pytest.ini
+# 목록: "해시16 경로(앱 폴더 기준)" 한 줄씩. 기록(state.json prep)은 잠금 때와 qa 통과 때 남긴다. 없음은 "~".
+prep_now() {
+  local locked; locked="$(bash "$HOOKS/check-approved.sh" files "$APPDIR" </dev/null 2>/dev/null)"
+  find "$APPDIR" -type f \( -path "$APPDIR/tests/*" -o -name 'playwright.config.*' -o -name 'vitest.config.*' -o -name conftest.py -o -name pytest.ini \) \
+    ! -path '*/node_modules/*' ! -path '*/__pycache__/*' ! -name '*.pyc' ! -name '.*' 2>/dev/null | sort |
+  while IFS= read -r f; do
+    [ -n "$locked" ] && printf '%s\n' "$locked" | grep -qxF "$f" && continue
+    printf '%s %s\n' "$(tr -d '\r' < "$f" | sha256sum | cut -c1-16)" "${f#"$APPDIR"/}"
+  done
+}
+prep_save() { local p; p="$(prep_now | paste -sd';' -)"; kset prep "${p:-~}"; }
+prep_changed() { # 지난 기록 뒤 바뀐·생긴·지운 준비 코드 경로(기록 없으면 지금 있는 것 모두)
+  local old; old="$(kget prep)"
+  prep_now > "$T/prep.now"
+  if [ -z "$old" ]; then cut -d' ' -f2- "$T/prep.now"; return; fi
+  [ "$old" = "~" ] && old=""
+  printf '%s' "$old" | tr ';' '\n' | grep -v '^$' > "$T/prep.old"
+  { grep -vxF -f "$T/prep.old" "$T/prep.now"; grep -vxF -f "$T/prep.now" "$T/prep.old"; } | cut -d' ' -f2- | sort -u
+}
+prep_review_ok() { # 바뀐 준비 코드마다 review.md "## 준비 코드 변경" 절에 "- <경로>" 줄
+  local ch miss="" p sec
+  ch="$(prep_changed)"; [ -z "$ch" ] && return 0
+  sec="$( [ -f "$APPDIR/docs/review.md" ] && awk '/^## 준비 코드 변경/ { f=1; next } /^## / { f=0 } f' "$APPDIR/docs/review.md")"
+  while IFS= read -r p; do
+    [ -z "$p" ] && continue
+    printf '%s\n' "$sec" | grep -Eq "^[[:space:]]*- \`?$(printf '%s' "$p" | sed 's/[][\.*^$/]/\\&/g')\`?([[:space:]]|$)" || miss="$miss $p"
+  done <<< "$ch"
+  [ -z "$miss" ] && return 0
+  PREP_MSG="지난 리뷰(또는 잠금) 뒤 바뀐 준비 코드를 qa가 보지 않았습니다:$miss
+diff를 보고(git diff -- <파일>, 새 파일은 내용 전체) docs/review.md 의 '## 준비 코드 변경' 절에 파일마다 '- <앱 폴더 기준 경로> — 괜찮음|문제: <이유>' 한 줄씩 적으세요."
+  return 1
+}
 lock_ok() { bash "$HOOKS/check-approved.sh" lock "$APPDIR" </dev/null >/dev/null 2>&1; }
 has_server() { [ "$(st bb)" != "건너뜀" ]; }
 has_screen() { [ "$(st ui)" != "건너뜀" ]; }
@@ -231,8 +334,7 @@ run_check() { # 노드의 ⚙️ 검사. 실패면 CHECK_MSG 와 함께 1
     lock) lock_ok || { CHECK_MSG="테스트 잠금 파일이 없거나 해시가 다릅니다."; return 1; } ;;
     backend) run_tests 백엔드 || { CHECK_MSG="백엔드 테스트 실패:
 $(printf '%s\n' "$TEST_OUT" | tail -n 15)"; return 1; } ;;
-    tests) run_tests || { CHECK_MSG="테스트 실패:
-$(printf '%s\n' "$TEST_OUT" | tail -n 15)"; return 1; }
+    tests) tests_ok || { CHECK_MSG="$TESTS_MSG"; return 1; }
            lock_ok || { CHECK_MSG="승인된 테스트 해시가 다릅니다(사장 허락 없이 바뀜)."; return 1; } ;;
     perf) local r; r="$(perf_check)"; printf '%s\n' "$r" | grep -q '^fail' && { CHECK_MSG="수치 미달: $(printf '%s\n' "$r" | grep '^fail' | cut -d' ' -f2,4- | paste -sd, -)"; return 1; } ;;
     redteam) redteam_ok || { CHECK_MSG=".redteam-needed 표시가 남아 있거나 docs/redteam.md가 없습니다."; return 1; } ;;
@@ -294,11 +396,11 @@ do_lock() {
   bash "$HOOKS/check-approved.sh" lock "$APPDIR" </dev/null >/dev/null 2>&1; rc=$?
   if [ $rc -eq 1 ] && ! locked_before; then
     if LOCK_OUT="$(bash "$HOOKS/auto-lock.sh" "$APPDIR" </dev/null 2>&1)"; then
-      log_add lock lock "" "첫 잠금 자동(auto-lock.sh)"; advance lock ""; return 0
+      log_add lock lock "" "첫 잠금 자동(auto-lock.sh)"; prep_save; advance lock ""; return 0
     fi
     setst lock "사장보고"; set_wait lock "②" "자동 잠금 실패: $(printf '%s' "$LOCK_OUT" | tail -n1)"; return 0
   fi
-  if [ $rc -eq 0 ]; then log_add lock-ok lock "" "잠금 그대로(해시 일치)"; advance lock ""; return 0; fi
+  if [ $rc -eq 0 ]; then log_add lock-ok lock "" "잠금 그대로(해시 일치)"; [ -z "$(kget prep)" ] && prep_save; advance lock ""; return 0; fi
   # 승인된 테스트가 바뀌어 다시 잠가야 함 → 사장만(⑤)
   setst lock "사장대기"; set_wait lock "⑤" "승인된 테스트를 다시 잠가야 합니다. 사장이 붙여 넣을 한 줄: $(relock_line)"
 }
@@ -346,8 +448,13 @@ advance() { # id, 고른 다음
 need_cur() { in_cur "$1" || die 1 "[그래프 $APP] $1 은(는) 지금 노드가 아닙니다. 현재: $(cur | sed 's/^$/없음/')"; }
 
 cmd_pass() {
-  local id="$1" choice="$2" s kind
+  local id="$1" choice="$2" s kind nx
   is_node "$id" || die 1 "graph.md에 없는 노드: $id"
+  if [ -n "$choice" ]; then   # 다음 노드를 주면 표의 '다음' 칸에 있어야 한다(무시하지 않고 거부)
+    nx="$(nf "$id" 9)"
+    { [ "$nx" != "-" ] && in_list "$choice" "$(opts "$nx" | tr ' ' ',')"; } ||
+      die 1 "[그래프 $APP] 표에 없는 다음 노드: $id → $choice (graph.md '다음' 칸: $nx)"
+  fi
   s="$(st "$id")"
   if ! in_cur "$id"; then
     [ "$s" = "통과" ] && { say "[그래프 $APP] $id 는 이미 통과 — 기록은 그대로 둡니다."; exit 0; }
@@ -361,11 +468,14 @@ cmd_pass() {
   elif [ "$s" = "사장대기" ] && [ "$id" != lock ]; then
     die 1 "[그래프 $APP] $id 는 사장 대기입니다. 사장 답을 받은 뒤 graph.sh resume $APPDIR $id"
   fi
+  outputs_ok "$id" || die 1 "[그래프 $APP] $id 통과 검사 실패 — $OUT_MSG"
+  if [ "$id" = qa ]; then prep_review_ok || die 1 "[그래프 $APP] qa 통과 검사 실패 — $PREP_MSG"; fi
   run_check "$id" || die 1 "[그래프 $APP] $id 통과 검사 실패 — $CHECK_MSG
 (실패면: graph.sh fail $APPDIR $id \"<이유>\" [보낼 곳])"
   if locked_before && [ "$(nf "$id" 8)" != lock ]; then
     lock_ok || die 1 "[그래프 $APP] 승인된 테스트 해시가 다릅니다. 승인 테스트는 사장 허락 없이 바꾸지 않습니다 — 되돌리거나 사장에게 알리세요."
   fi
+  [ "$id" = qa ] && prep_save   # 다음 리뷰는 여기서부터 바뀐 준비 코드만
   advance "$id" "$choice"
   write_state
   status_short
@@ -465,17 +575,24 @@ cmd_resume() {
   log_add resume "$id" "" ""; write_state; say "[그래프 $APP] $id 다시 진행"
 }
 cmd_skip() {
-  local list="$1" reason="${2:-건너뜀}" id
+  local list="$1" reason="${2:-건너뜀}" id why
+  # 연쇄: 건너뛰기 칸이 같은 노드("서버 없음" dd·ok-dd·bb·cb / "화면 없음" ui·ok-ui·ug)를 함께 건너뛴다(graph.md 순서)
+  for id in $(opts "$list"); do is_node "$id" || die 1 "graph.md에 없는 노드: $id"; done
+  list="$(for id in $(opts "$list"); do why="$(nf "$id" 14)"; echo "$id"
+            [ "$why" != "-" ] && awk -F'\t' -v w="$why" '$14==w { print $1 }' "$NT"; done |
+          awk '!s[$0]++' | while read -r id; do printf '%s %s\n' "$(order_of "$id")" "$id"; done | sort -n | awk '{ print $2 }' | paste -sd, -)"
   for id in $(opts "$list"); do
     is_node "$id" || die 1 "graph.md에 없는 노드: $id"
     [ "$(nf "$id" 14)" != "-" ] || die 1 "[그래프 $APP] $id 는 건너뛸 수 없는 노드입니다(graph.md 건너뛰기 칸)."
     case "$(st "$id")" in 대기|진행|사장대기) ;; 건너뜀) continue ;; *) die 1 "[그래프 $APP] $id 는 지금 건너뛸 수 없습니다($(st "$id"))." ;; esac
   done
+  local was=""   # 먼저 모두 건너뜀으로 바꾼 뒤, 지금 노드였던 것만 지나간다(연쇄 노드에 잘못 들어가지 않게)
   for id in $(opts "$list"); do
     [ "$(st "$id")" = "건너뜀" ] && continue
     setst "$id" "건너뜀"; log_add skip "$id" "" "$reason"
-    if in_cur "$id"; then cur_del "$id"; clear_wait "$id"; follow "$id"; fi
+    if in_cur "$id"; then cur_del "$id"; clear_wait "$id"; was="$was $id"; fi
   done
+  for id in $was; do follow "$id"; done
   write_state; say "[그래프 $APP] 건너뜀: $list ($reason)"; status_short
 }
 cmd_budget() {
@@ -500,7 +617,7 @@ cmd_loop() {
   local id="" c out sig r sm
   for c in bb bf; do in_cur "$c" && [ "$(st "$c")" = "진행" ] && { id="$c"; break; }; done
   [ -z "$id" ] && exit 0
-  if run_check "$id" && { ! locked_before || lock_ok; }; then
+  if run_check "$id" && { ! locked_before || lock_ok; } && { outputs_ok "$id" || { CHECK_MSG="$OUT_MSG"; false; }; }; then
     advance "$id" ""; write_state
     say "[그래프 $APP·$id] 통과(⚙️ $(nf "$id" 7)). 다음 노드 $(cur | sed 's/^$/없음/')를 시작하세요. progress.md에 마지막 회차를 적으세요."
     exit 21
@@ -538,7 +655,7 @@ cmd_score() {
   : > "$items"
   local srv=bf; has_server && srv=bb
   # 1. 필수 관문
-  if ! run_tests; then g="승인 테스트 100% 통과 아님"; gown=bf
+  if ! tests_ok; then g="승인 테스트 100% 통과 아님($(printf '%s' "$TESTS_MSG" | head -n1))"; gown=bf
   elif ! lock_ok; then g="잠금 해시 다름"; gown=""
   elif ! secrets_ok; then g="비밀값 검사 걸림"; gown=$srv
   elif [ -f "$APPDIR/docs/redteam.md" ] && grep -Eq '^[[:space:]]*- \[뚫림\] \[심각\].*해결: *아직' "$APPDIR/docs/redteam.md"; then g="레드팀 심각 뚫림 남음"; gown=$srv
@@ -748,6 +865,7 @@ usage() {
   loop                           (Stop 훅) 구현 노드 통과 검사·회차 세기
   score                          (sc) 필수 관문 + 완성도 점수
   init | migrate | confirm <노드> 통과|대기 | current [--status] | get … | lint
+  tcount (앱 없이, 표준 입력)    테스트 실행 출력에서 개수 읽기: 통과·건너뜀·실패·읽은 형식 수
 U
 }
 
@@ -755,6 +873,7 @@ U
 cmd="$1"; shift 2>/dev/null
 case "$cmd" in
   lint) cmd_lint; exit ;;
+  tcount) tcount_parse; exit 0 ;;
   ""|-h|--help|help) usage; exit 0 ;;
 esac
 set_app "$1"; shift 2>/dev/null

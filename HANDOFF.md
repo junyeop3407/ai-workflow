@@ -1,6 +1,6 @@
 # HANDOFF — 다음 세션 시작 가이드
 
-마지막 갱신: 2026-11-20 (그래프 엔지니어링)
+마지막 갱신: 2026-11-20 (그래프 검증 4가지 고침)
 
 ## 1. 한 줄 요약
 이석균 선배님 특강(AI 기초)의 방식대로 앱을 만드는 **작업장 견본**이다. 사용자는 **사장**, Claude의 팀들(기획·디자인·프론트엔드·백엔드·QA)은 **직원**이고, 모든 팀의 결과물은 사장 검토를 받는다. 규칙, `/build-app` 스킬, 교차 리뷰, 훅, **그래프(앱 작업이 graph.md 흐름을 따라 자동으로 흐름, 사장은 ★에서 보기만 누름)** 가 준비되어 있고 아직 만든 앱은 없다. **다음 할 일: 첫 앱 만들기 (`/build-app 만들고 싶은 것`).**
@@ -28,6 +28,7 @@
 |---|---|---|
 | 0~3 | 폴더 구조, 규칙(CLAUDE.md), `/build-app` 스킬, 훅 | ✅ 준비됨 |
 | 그래프 | `build-app/graph.md`(노드 32·실패 엣지·멈추는 곳 다섯·체크리스트 20 대응) + `apps/<앱>/state.json` + `graph.sh`(순서 강제) + 훅(SessionStart·UserPromptSubmit·Stop 자동 루프·state 직접 편집 막기). 사장 명령 0번(첫 잠금 자동 `auto-lock.sh`, /goal 대신 Stop 훅 자동 루프, 올리기는 Claude가 실행), 구현~QA 보고 사이 질문 0번(`ask-later.md`), 완성도 90%(필수 관문 + 점수, `graph.sh score`), bb(백엔드: JUnit + api.md 예시 `api-check.sh`, `templates/backend.sh`) → bf 순서. 시험 `test-graph.sh` 59개·`test-hooks.sh --settings` 129개 | ✅ 2026-11-20 |
+| 그래프 검증 고침 | ① 테스트 개수 확인: bf·tr·sc가 exit 0만 믿지 않고 출력에서 개수를 읽어 통과 ≥ 승인된 테스트 수·건너뜀 0일 때만 통과, 못 읽으면 거부(`run.sh`를 `exit 0`으로 위조하는 길 차단, `graph.sh tcount`, Playwright·Vitest·Jest·pytest·Maven·Gradle·node --test). 바뀐 준비 코드(run.sh·conftest·fixtures·config)는 qa가 review.md `## 준비 코드 변경`에 파일마다 적어야 통과 ② AI 노드 "내는 것" 파일이 있고 비어 있지 않아야 pass ③ "서버 없음"·"화면 없음" 건너뛰기 연쇄 ④ pass에 표에 없는 다음 노드 → 거부. 시험 `test-graph.sh` 99개·`test-hooks.sh --settings` 129개. 남은 위험: run.sh가 합계 줄을 echo로 꾸미면 graph.sh는 못 가림(qa 준비 코드 리뷰가 잡음) | ✅ 2026-11-20 |
 | 다음 | 첫 앱 만들기 (`apps/<앱이름>/`) | ⬜ 다음 |
 | 교차 리뷰 | Codex + Gemini CLI 리뷰 (**둘 다 필수**, 변경분 1라운드, README 참고) | ✅ 준비됨 |
 | 구조 정리 | CLAUDE.md를 rules·skills·hooks·agents로 나눔 (130 → 93줄) | ✅ 2026-11-01 |
