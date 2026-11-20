@@ -111,6 +111,8 @@ G pass $A ug >/dev/null; G pass $A tr >/dev/null;      snap "ug → ⚙️ 테�
 printf '## Claude 판단\n- [틀림] 없음 — 이유: 확인함\n' > $A/docs/review.md
 row "qa: 잠금 뒤 생긴 준비 코드(tests/backend.sh)를 리뷰 안 함 → 거부" "1 qa" "$(rc G pass $A qa) $(cur_of shop)"
 printf '\n## 준비 코드 변경\n- tests/backend.sh — 괜찮음: 백엔드 테스트 실행만\n' >> $A/docs/review.md
+row "qa: 잠금 때 있던 run.sh도 첫 리뷰 대상(잠금 때 기록 안 함) → 거부" 1 "$(rc G pass $A qa)"
+printf -- '- tests/run.sh — 괜찮음: 가짜 Playwright 실행\n' >> $A/docs/review.md
 mk docs/review_result.md
 G pass $A qa >/dev/null; G pass $A cx >/dev/null; G pass $A gm >/dev/null
 snap "qa → Codex 교차 → Gemini 교차 (가정: 맞는 지적 해결)" "-"
@@ -299,6 +301,20 @@ row "→ fixtures·playwright.config도 새로 생김 → 빠지면 거부" 1 "$
 printf -- '- tests/fixtures/a.json — 괜찮음\n- playwright.config.ts — 괜찮음\n' >> apps/q1/docs/review.md
 row "→ 모두 적으면 통과" 0 "$(rc G pass apps/q1 qa)"
 rm -rf apps/q1
+# 보안 리뷰 지적: 경로 정규식 끼워 넣기, 점 파일·러너 설정 빠짐
+mkstate q2 qa 진행; printf "test('a', () => {})\n" > apps/q2/tests/a.spec.ts; bash "$H/approve-tests.sh" apps/q2 >/dev/null
+echo 'exit 0' > 'apps/q2/tests/a+b.sh'
+printf '## 준비 코드 변경\n- tests/run.sh — 괜찮음\n- tests/aab.sh — 괜찮음\n' > apps/q2/docs/review.md
+row "qa: 파일 a+b.sh 대신 aab.sh를 적음(정규식처럼 맞춰짐) → 거부" 1 "$(rc G pass apps/q2 qa)"
+printf -- '- tests/a+b.sh — 괜찮음\n' >> apps/q2/docs/review.md
+echo 'export X=1' > apps/q2/tests/.setup.sh
+row "qa: 점으로 시작하는 준비 코드(tests/.setup.sh) → 적어야 함" 1 "$(rc G pass apps/q2 qa)"
+printf -- '- tests/.setup.sh — 괜찮음\n' >> apps/q2/docs/review.md
+echo '{"scripts":{"test":"exit 0"}}' > apps/q2/package.json; echo 'test {}' > apps/q2/build.gradle
+row "qa: 러너 설정(package.json·build.gradle) → 적어야 함" 1 "$(rc G pass apps/q2 qa)"
+printf -- '- package.json — 괜찮음\n- `build.gradle` — 괜찮음\n' >> apps/q2/docs/review.md
+row "→ 모두 적으면 통과(경로에 백틱 있어도 같은 경로로 셈)" 0 "$(rc G pass apps/q2 qa)"
+rm -rf apps/q2
 
 # F3. AI 노드 "내는 것" 파일이 있고 비어 있지 않아야 pass
 mkstate o1 req 진행

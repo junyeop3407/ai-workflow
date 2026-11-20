@@ -276,13 +276,19 @@ outputs_ok() {
   OUT_MSG="내는 것이 없습니다:$miss (앱 폴더 기준, graph.md 노드 표 '내는 것')"; return 1
 }
 
-# 준비 코드: tests/ 안에서 잠기지 않은 파일 + 앱 안의 playwright.config.*·vitest.config.*·conftest.py·pytest.ini
-# 목록: "해시16 경로(앱 폴더 기준)" 한 줄씩. 기록(state.json prep)은 잠금 때와 qa 통과 때 남긴다. 없음은 "~".
+# 준비 코드: tests/ 안에서 잠기지 않은 파일(점 파일 포함, 잠금 파일만 뺌) + 앱 안의 테스트 러너 설정
+#   (playwright·vitest·vite·jest config, conftest.py, pytest.ini, pyproject.toml, setup.cfg, tox.ini, package.json, build.gradle*, pom.xml)
+# 목록: "해시16 경로(앱 폴더 기준)" 한 줄씩. 기록(state.json prep)은 **qa 통과 때만** 남긴다(잠금 때 남기면 아무도 안 본 파일이 기준이 됨).
+# 기록이 없으면 첫 qa가 지금 있는 준비 코드 전부를 본다. 기록했는데 0개면 "~".
 prep_now() {
-  local locked; locked="$(bash "$HOOKS/check-approved.sh" files "$APPDIR" </dev/null 2>/dev/null)"
-  find "$APPDIR" -type f \( -path "$APPDIR/tests/*" -o -name 'playwright.config.*' -o -name 'vitest.config.*' -o -name conftest.py -o -name pytest.ini \) \
-    ! -path '*/node_modules/*' ! -path '*/__pycache__/*' ! -name '*.pyc' ! -name '.*' 2>/dev/null | sort |
+  local locked lf; locked="$(bash "$HOOKS/check-approved.sh" files "$APPDIR" </dev/null 2>/dev/null)"
+  lf="$(bash "$HOOKS/check-approved.sh" listfile "$APPDIR" </dev/null 2>/dev/null)"
+  find "$APPDIR" -type f \( -path "$APPDIR/tests/*" -o -name 'playwright.config.*' -o -name 'vitest.config.*' -o -name 'vite.config.*' \
+      -o -name 'jest.config.*' -o -name conftest.py -o -name pytest.ini -o -name pyproject.toml -o -name setup.cfg -o -name tox.ini \
+      -o -name package.json -o -name 'build.gradle*' -o -name pom.xml \) \
+    ! -path '*/node_modules/*' ! -path '*/__pycache__/*' ! -name '*.pyc' 2>/dev/null | sort |
   while IFS= read -r f; do
+    [ "$f" = "$lf" ] && continue
     [ -n "$locked" ] && printf '%s\n' "$locked" | grep -qxF "$f" && continue
     printf '%s %s\n' "$(tr -d '\r' < "$f" | sha256sum | cut -c1-16)" "${f#"$APPDIR"/}"
   done
@@ -299,10 +305,12 @@ prep_changed() { # 지난 기록 뒤 바뀐·생긴·지운 준비 코드 경로
 prep_review_ok() { # 바뀐 준비 코드마다 review.md "## 준비 코드 변경" 절에 "- <경로>" 줄
   local ch miss="" p sec
   ch="$(prep_changed)"; [ -z "$ch" ] && return 0
-  sec="$( [ -f "$APPDIR/docs/review.md" ] && awk '/^## 준비 코드 변경/ { f=1; next } /^## / { f=0 } f' "$APPDIR/docs/review.md")"
+  # 절 안의 "- <경로> …" 줄에서 경로만 꺼내(백틱 벗김) 글자 그대로 비교한다(정규식으로 맞추지 않음)
+  sec="$( [ -f "$APPDIR/docs/review.md" ] && tr -d '\r' < "$APPDIR/docs/review.md" |
+    awk '/^## 준비 코드 변경/ { f=1; next } /^## / { f=0 } f && /^[[:space:]]*- / { sub(/^[[:space:]]*- /, ""); gsub(/`/, ""); print $1 }')"
   while IFS= read -r p; do
     [ -z "$p" ] && continue
-    printf '%s\n' "$sec" | grep -Eq "^[[:space:]]*- \`?$(printf '%s' "$p" | sed 's/[][\.*^$/]/\\&/g')\`?([[:space:]]|$)" || miss="$miss $p"
+    printf '%s\n' "$sec" | grep -qxF -- "$p" || miss="$miss $p"
   done <<< "$ch"
   [ -z "$miss" ] && return 0
   PREP_MSG="지난 리뷰(또는 잠금) 뒤 바뀐 준비 코드를 qa가 보지 않았습니다:$miss
@@ -396,11 +404,11 @@ do_lock() {
   bash "$HOOKS/check-approved.sh" lock "$APPDIR" </dev/null >/dev/null 2>&1; rc=$?
   if [ $rc -eq 1 ] && ! locked_before; then
     if LOCK_OUT="$(bash "$HOOKS/auto-lock.sh" "$APPDIR" </dev/null 2>&1)"; then
-      log_add lock lock "" "첫 잠금 자동(auto-lock.sh)"; prep_save; advance lock ""; return 0
+      log_add lock lock "" "첫 잠금 자동(auto-lock.sh)"; advance lock ""; return 0
     fi
     setst lock "사장보고"; set_wait lock "②" "자동 잠금 실패: $(printf '%s' "$LOCK_OUT" | tail -n1)"; return 0
   fi
-  if [ $rc -eq 0 ]; then log_add lock-ok lock "" "잠금 그대로(해시 일치)"; [ -z "$(kget prep)" ] && prep_save; advance lock ""; return 0; fi
+  if [ $rc -eq 0 ]; then log_add lock-ok lock "" "잠금 그대로(해시 일치)"; advance lock ""; return 0; fi
   # 승인된 테스트가 바뀌어 다시 잠가야 함 → 사장만(⑤)
   setst lock "사장대기"; set_wait lock "⑤" "승인된 테스트를 다시 잠가야 합니다. 사장이 붙여 넣을 한 줄: $(relock_line)"
 }

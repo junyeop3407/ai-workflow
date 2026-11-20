@@ -7,11 +7,14 @@
 #   check-approved.sh listed apps/<앱> <경로> : (graph.sh) 그 파일이 잠금 목록에 있으면 0
 #   check-approved.sh files apps/<앱>         : (graph.sh) 잠긴 파일 경로(저장소 기준)를 한 줄씩. 잠금 없으면 빈 출력
 #   check-approved.sh count apps/<앱>         : (graph.sh) 잠긴 파일 안의 테스트 정의 수. 잠금 없으면 0
+#   check-approved.sh listfile apps/<앱>      : (graph.sh) 잠금 파일 경로(저장소 기준) 한 줄
 #       JS·TS: test('…')·it('…') (+ .only·.fixme·.fail·.concurrent) — 제목 글자로 시작하는 것만(describe·step·hook 제외)
 #       Python: def test_… / Java·Kotlin: @Test, @ParameterizedTest, @RepeatedTest
 # 종료 코드 2 = 막기 (stderr 내용이 Claude에게 전달된다), 0 = 통과. jq 없이 동작한다.
 
 mode="$1"
+
+if [ "$mode" = "listfile" ]; then echo "${2%/}/tests/.approved"; exit 0; fi   # (graph.sh) 잠금 파일 경로 — 준비 코드에서 이것만 뺀다
 
 if [ "$mode" = "files" ] || [ "$mode" = "count" ]; then
   root="$(git rev-parse --show-toplevel 2>/dev/null)" || exit 1

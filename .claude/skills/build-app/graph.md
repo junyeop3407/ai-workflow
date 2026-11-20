@@ -183,7 +183,7 @@ flowchart TD
 
 - 남은 위험: `run.sh`가 합계 줄을 `echo`로 꾸며 찍으면 graph.sh는 못 가린다 → 아래 "준비 코드 리뷰"로 qa가 그 diff를 반드시 본다.
 
-**준비 코드 리뷰**(qa): 준비 코드 = `tests/` 안에서 잠기지 않은 파일(`run.sh`·`conftest.py`·`fixtures/`·`helpers/`·`backend.sh` 등) + 앱 안의 `playwright.config.*`·`vitest.config.*`·`conftest.py`·`pytest.ini`. 지금처럼 고칠 수 있다. graph.sh가 잠금 때와 qa 통과 때 해시를 state.json `prep`에 남기고, qa를 pass할 때 그 뒤 **바뀐·생긴·지운** 준비 코드마다 `docs/review.md`의 `## 준비 코드 변경` 절에 `- <앱 폴더 기준 경로> — 괜찮음|문제: <이유>` 줄이 있어야 통과(기록이 없는 앱은 첫 qa에서 준비 코드 전부). 테스트를 약하게 만드는 변경(검사 건너뛰기·합계 꾸미기·기다리는 시간으로 실패 가리기)은 `[맞음]` 지적으로 올린다.
+**준비 코드 리뷰**(qa): 준비 코드 = `tests/` 안에서 잠기지 않은 파일(점 파일 포함, 잠금 파일만 뺌: `run.sh`·`conftest.py`·`fixtures/`·`helpers/`·`backend.sh` 등) + 앱 안의 러너 설정(`playwright.config.*`·`vitest.config.*`·`vite.config.*`·`jest.config.*`·`conftest.py`·`pytest.ini`·`pyproject.toml`·`setup.cfg`·`tox.ini`·`package.json`·`build.gradle*`·`pom.xml`, `node_modules` 제외). 지금처럼 고칠 수 있다. graph.sh가 **qa 통과 때만** 해시를 state.json `prep`에 남긴다(잠금 때는 남기지 않음 — 아무도 안 본 파일이 기준이 되지 않게). 그래서 **첫 qa는 지금 있는 준비 코드 전부**, 그다음 qa는 지난 qa 뒤 **바뀐·생긴·지운** 것마다 `docs/review.md`의 `## 준비 코드 변경` 절에 `- <앱 폴더 기준 경로> — 괜찮음|문제: <이유>` 줄이 있어야 통과. 경로는 줄 맨 앞 낱말을 백틱만 벗겨 **글자 그대로** 비교한다(정규식으로 맞추지 않음). 테스트를 약하게 만드는 변경(검사 건너뛰기·합계 꾸미기·기다리는 시간으로 실패 가리기)은 `[맞음]` 지적으로 올린다.
 
 ## 파일 형식 (graph.sh가 읽는 것)
 **api.md 예시**(bb 검사, `.claude/skills/build-app/api-check.sh`): 예시마다 아래 세 줄 묶음. `"<아무거나>"`는 키만 확인.
