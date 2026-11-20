@@ -10,10 +10,11 @@
 | 앱 만들기·기능 추가·이어 하기 | `/build-app <만들 것>` |
 | 단계 마무리 (HANDOFF → 커밋 → 푸시) | `/handoff` |
 | 테스트 돌리기 | `test-runner` 에이전트 (명령은 `apps/<앱>/HANDOFF.md`의 `테스트 실행:` 줄) |
-| 승인된 테스트 잠그기 (3단계, **사장만**) | `! bash .claude/hooks/approve-tests.sh apps/<앱>` |
+| 그래프 상태 (현재 노드·다음·멈춤 이유) | `bash .claude/skills/build-app/graph.sh status apps/<앱>` |
+| 승인된 테스트 **다시** 잠그기 (**사장만**, 첫 잠금은 자동) | `! bash .claude/hooks/approve-tests.sh apps/<앱>` |
 | 교차 리뷰 (4·5단계, 필수) | `bash .claude/skills/build-app/cross-review.sh apps/<앱> <기준> [codex\|gemini]` |
 | 주간 회고 (반복된 실수 → 규칙 후보 최대 3개) | `/weekly-review` |
-| 훅 시험 | `bash .claude/hooks/test-hooks.sh --settings` |
+| 훅 시험 | `bash .claude/hooks/test-hooks.sh --settings` · `bash .claude/hooks/test-graph.sh` |
 
 ## 저장소 구조
 ```
@@ -41,7 +42,7 @@
 | 테스트(승인된 테스트 보호, 회귀 테스트) | `.claude/rules/testing.md` | `tests/`·테스트 파일을 열 때 |
 | 앱 한 바퀴 절차, 단계별 스킬 사용 표 | `/build-app` 스킬 | 앱 작업을 시작할 때 |
 | 커밋·푸시 절차 | `/handoff` 스킬 | 단계가 끝날 때 |
-| 4단계 구현 루프(`/goal` 한 문장·`progress.md` 일지·브레이크), 사장 확인 루프 | `/build-app` 스킬 | 앱 작업을 시작할 때 |
+| 앱 흐름(노드·실패 엣지·멈추는 곳 다섯·완성도 90%), 상태 `apps/<앱>/state.json` | `build-app/graph.md` + `graph.sh`, 자동 진행은 훅(`graph-prompt`·`graph-stop`·`session-start`) | 앱 작업을 시작할 때 · 항상(훅) |
 | 강제 푸시·비밀값 커밋·실패 상태 커밋 | `.claude/hooks/` | 항상 (Claude 판단과 상관없이 막음) |
 | 승인된 테스트 잠금(`tests/.approved` 해시) | `protect-tests.sh`·`check-approved.sh` | 항상 (수정 시 확인 창, 커밋 직전·응답 끝에 해시 비교) |
 | 민감한 파일(로그인·결제 등) 수정 → 레드팀 다시 돌리기 표시 | `.claude/hooks/flag-redteam.sh` | 항상 (고칠 때·커밋 직전, `apps/<앱>/.redteam-needed` 생성) |
@@ -57,8 +58,8 @@
 - 사용자는 개발 초보로 가정한다. 질문은 한 번에 하나씩, 쉬운 말로, 가능하면 고를 수 있는 보기와 추천을 붙인다. 애매하면 추측하지 말고 묻는다.
 
 ## 일하는 순서
-**앱을 새로 만들거나, 기능을 더하거나, 하던 앱을 이어 할 때는 사용자가 따로 말하지 않아도 반드시 `/build-app`을 먼저 불러 그 순서대로 한다.**
-요약: 질문으로 요구사항 → 설계안 3개 중 고르기 → 테스트 목록 승인(사장이 잠금) → 계획 모드로 계획·승인 → `/goal` 구현 루프(일지 `progress.md`) → 분리된 리뷰 + Codex·Gemini 교차 리뷰 → 레드팀 → 테스트 통과 확인 후 보고.
+**앱을 새로 만들거나, 기능을 더하거나, 하던 앱을 이어 할 때는 사용자가 따로 말하지 않아도 반드시 `/build-app`을 먼저 불러 `build-app/graph.md` 흐름을 자동으로 따른다.** 상태는 `apps/<앱>/state.json`(graph.sh만 씀).
+사장은 ★에서 보기만 누른다(명령 0번, 질문은 구현 전에만). 멈추는 곳은 ① ★ 질문 ② 횟수 초과·정체 보고 ③ 도구 없음 ④ 비용 큰 일(탐색 사용량 2배 초과) ⑤ 안전장치가 막은 외부 공개·재잠금뿐 — 이 밖에는 묻지도 멈추지도 않는다.
 테스트를 실제로 돌려서 통과를 확인하기 전에는 "다 됐다"고 말하지 않는다.
 `/build-app` 밖에서 코드를 고칠 때도, 라이브러리 API를 쓰기 전에는 사장이 말하지 않아도 `context7`로 그 버전의 문서를 먼저 확인한다(화면 코드는 `modern-web-guidance`도).
 
@@ -99,6 +100,8 @@
 ## Git과 여러 컴퓨터
 - 이 저장소는 GitHub로 여러 컴퓨터에서 이어 작업한다. **모든 상태는 파일에 남긴다** (대화에만 있는 정보는 다른 컴퓨터에서 사라진다).
 - 작업 시작 전 `git pull`. 단계가 끝나면 `/handoff`. 한 커밋에 한 가지 일, 메시지는 한국어로 "무엇을, 왜".
+- 커밋 메시지는 `git commit -m "..."` 한 줄로 쓴다(-F·heredoc은 승인 단어 검사에 막힐 수 있음).
+- git add / commit / pull / push / cd는 `&&` `;`로 잇지 말고 한 줄에 하나씩 실행한다(승인 단어가 든 명령에 붙이면 막힘).
 
 ## 절대 하지 않을 것 (대부분 훅이 막는다 — 막히면 우회하지 말고 고친다)
 - 테스트가 실패하는 상태로 커밋 *(훅: check-tests)*

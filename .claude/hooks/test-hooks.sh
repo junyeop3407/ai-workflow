@@ -152,6 +152,41 @@ printf 'exit 0\n' > apps/demo2/tests/run.sh
 row "(기존) check-tests: 테스트 통과 앱 commit" 통과 "$(run "$(bash_json "git commit -m x")" check-tests.sh commit)"
 rm -rf apps/demo2
 
+# ---- check-tests: 그래프 현재 노드에 따라 검사 줄 고르기 (bb·cb = 백엔드 테스트, 그 밖 = 테스트 실행) ----
+G="$src/.claude/skills/build-app/graph.sh"
+mkdir -p apps/demo3/tests
+printf '# demo3\n현재 단계: 4\n테스트 실행: `bash tests/run.sh`\n백엔드 테스트: `bash tests/backend.sh`\n' > apps/demo3/HANDOFF.md
+printf 'exit 1\n' > apps/demo3/tests/run.sh   # 승인된 Playwright 흉내: 실패(프론트 아직)
+bash "$G" init apps/demo3 >/dev/null 2>&1
+cp apps/demo3/state.json "$tmp/.st3"
+at_node() { # 시험용: 현재 노드를 $1, 상태를 $2 로 바꾼 가짜 state.json
+  cp "$tmp/.st3" apps/demo3/state.json
+  sed -i "s/\"current\": \[[^]]*\]/\"current\": [\"$1\"]/; s/\"req\": {\"status\": \"진행\"/\"req\": {\"status\": \"통과\"/; s/\"$1\": {\"status\": \"[^\"]*\"/\"$1\": {\"status\": \"$2\"/" apps/demo3/state.json
+}
+printf 'exit 0\n' > apps/demo3/tests/backend.sh
+at_node bb 진행
+row "bb + 백엔드 테스트 통과 + Playwright 실패 → commit" 통과 "$(run "$(bash_json "git commit -m x")" check-tests.sh commit)"
+printf 'exit 1\n' > apps/demo3/tests/backend.sh
+row "bb + 백엔드 테스트 실패 → commit" 막힘 "$(run "$(bash_json "git commit -m x")" check-tests.sh commit)"
+at_node bf 진행
+row "bf + Playwright 실패 → commit (bf부터는 테스트 실행 줄)" 막힘 "$(run "$(bash_json "git commit -m x")" check-tests.sh commit)"
+printf '{\n  "version": 1,\n' > apps/demo3/state.json
+row "state.json 깨짐 + Playwright 실패 → commit" 막힘 "$(run "$(bash_json "git commit -m x")" check-tests.sh commit)"
+at_node bb 진행
+row "stop: bb 진행 + 백엔드 실패 → 건너뜀(graph-stop 자동 루프가 맡음)" 통과 "$(run "$(stop_json false)" check-tests.sh stop)"
+at_node bf 진행
+row "stop: bf 진행 + Playwright 실패 → 건너뜀(graph-stop이 맡음)" 통과 "$(run "$(stop_json false)" check-tests.sh stop)"
+printf 'exit 0\n' > apps/demo3/tests/backend.sh
+at_node cb 진행
+row "stop: cb + 백엔드 통과 + Playwright 실패" 통과 "$(run "$(stop_json false)" check-tests.sh stop)"
+printf 'exit 1\n' > apps/demo3/tests/backend.sh
+row "stop: cb + 백엔드 실패" 막힘 "$(run "$(stop_json false)" check-tests.sh stop)"
+at_node tr 진행
+row "stop: tr + Playwright 실패" 막힘 "$(run "$(stop_json false)" check-tests.sh stop)"
+printf '{\n' > apps/demo3/state.json
+row "stop: state.json 깨짐 + Playwright 실패" 막힘 "$(run "$(stop_json false)" check-tests.sh stop)"
+rm -rf apps/demo3
+
 # ---- 5. 에이전트 메모리 (agent-memory-only.sh) ----
 row "red-team이 자기 메모리 폴더에 Write" 통과 "$(run "$(agent_write_json red-team "$tmp/.claude/agent-memory/red-team/MEMORY.md")" agent-memory-only.sh)"
 row "red-team이 앱 코드에 Write" 막힘 "$(run "$(agent_write_json red-team "$tmp/apps/demo/src/app.js")" agent-memory-only.sh)"
@@ -173,6 +208,63 @@ row "주간 회고 오늘 함, startup" "안 물음" "$(run_out "$(ss startup)" 
 printf '# demo\n현재 단계: 4 (구현)\n테스트 실행: `bash tests/run.sh`\n' > apps/demo/HANDOFF.md
 row "진행 중인 앱 있음 → test-runner 점검 알림" "알림" "$(run_out "$(ss startup)" session-start.sh | grep -q 'demo' && echo 알림 || echo 없음)"
 
+# ---- 그래프 훅 (graph-prompt.sh, graph-stop.sh, guard-state.sh, session-start 그래프 줄) ----
+G="$src/.claude/skills/build-app/graph.sh"
+gd="$(git rev-parse --git-dir)"
+rm -rf apps/demo apps/demo3; date +%Y-%m-%d > docs/last-weekly-review.txt
+row "SessionStart: 진행 중 앱 없음 → 그래프 줄 없음" "없음" "$(run_out "$(ss startup)" session-start.sh | grep -q '그래프' && echo 있음 || echo 없음)"
+mkg() { # 앱 현재노드 상태 — 시험용 가짜 state
+  rm -rf "apps/$1"; mkdir -p "apps/$1/src" "apps/$1/tests"
+  printf '# %s\n현재 단계: 4\n테스트 실행: `bash tests/run.sh`\n' "$1" > "apps/$1/HANDOFF.md"; printf 'exit 0\n' > "apps/$1/tests/run.sh"
+  bash "$G" init "apps/$1" >/dev/null 2>&1
+  sed -i -E '/^    "/ s/"status": "[^"]*"/"status": "통과"/; s/^(    "done": \{"status": )"통과"/\1"대기"/' "apps/$1/state.json"
+  sed -i -E "s/\"current\": \[[^]]*\]/\"current\": [\"$2\"]/; s/^(    \"$2\": \{\"status\": )\"[^\"]*\"/\1\"$3\"/" "apps/$1/state.json"
+}
+mkg shop ok-req 사장대기
+row "SessionStart(startup): 진행 중 앱 → 그래프 줄" "있음" "$(run_out "$(ss startup)" session-start.sh | grep -q '그래프 shop' && echo 있음 || echo 없음)"
+row "SessionStart(compact): 그래프 줄은 다시 넣음" "있음" "$(run_out "$(ss compact)" session-start.sh | grep -q '그래프 shop' && echo 있음 || echo 없음)"
+row "SessionStart(resume): 주간 회고·test-runner 점검은 안 넣음" "없음" "$(run_out "$(ss resume)" session-start.sh | grep -qE 'weekly-review|test-runner' && echo 있음 || echo 없음)"
+row "SessionStart 출력이 올바른 JSON 모양(따옴표 안 깨짐)" "정상" "$(run_out "$(ss startup)" session-start.sh | awk '{ n=gsub(/"/,"\"") } END { print (n%2==0 ? "정상" : "깨짐") }')"
+up() { printf '{"session_id":"t","hook_event_name":"UserPromptSubmit","prompt":"%s"}' "$1"; }
+row "UserPromptSubmit: 앱 작업(이어서 해 줘) → 현재 노드 한 줄" "있음" "$(run_out "$(up "shop 앱 이어서 해 줘")" graph-prompt.sh | grep -q 'ok-req' && echo 있음 || echo 없음)"
+row "→ 앱 작업 턴 표시(.git/graph-turn) 생김" "있음" "$([ -f "$gd/graph-turn" ] && echo 있음 || echo 없음)"
+row "UserPromptSubmit: ★ 대기 중 짧은 답(OK)도 앱 작업" "있음" "$(run_out "$(up "OK")" graph-prompt.sh | grep -q 'ok-req' && echo 있음 || echo 없음)"
+row "UserPromptSubmit: 잡담 → 아무것도 안 넣음" "없음" "$(o="$(run_out "$(up "오늘 날씨가 참 좋은 것 같은데 점심은 무엇을 먹으면 좋을지 추천해 주세요")" graph-prompt.sh)"; [ -z "$o" ] && echo 없음 || echo 있음)"
+row "→ 잡담이면 앱 작업 턴 표시 지움" "없음" "$([ -f "$gd/graph-turn" ] && echo 있음 || echo 없음)"
+row "UserPromptSubmit: 메시지는 절대 안 막음(exit 0)" "통과" "$(run "$(up "앱 만들어 줘")" graph-prompt.sh)"
+gst() { run "$(stop_json "${1:-false}")" graph-stop.sh; }
+echo turn > "$gd/graph-turn"
+row "Stop ①: ★ 노드 사장대기 → 정당한 멈춤" 통과 "$(gst)"
+mkg shop qa 사장보고;  row "Stop ②: 사장보고 → 통과" 통과 "$(gst)"
+mkg shop cx 도구없음;  row "Stop ③: 도구없음(Codex 미설치) → 통과" 통과 "$(gst)"
+mkg shop ex 사장대기;  row "Stop ④: 탐색 사용량 2배 초과(ex 사장대기) → 통과" 통과 "$(gst)"
+mkg shop lock 사장대기; row "Stop ⑤: 다시 잠그기 대기(lock 사장대기) → 통과" 통과 "$(gst)"
+mkg shop qa 진행; rm -f "$gd"/graph-stop-*
+row "Stop 부당: 진행 노드(qa)를 두고 멈춤 → 막힘" 막힘 "$(gst)"
+row "Stop 부당 2번째(stop_hook_active여도 같은 상태면) → 막힘" 막힘 "$(gst true)"
+row "Stop 부당 3번째 → 사장 보고로 바꾸고 막힘(보고하게)" 막힘 "$(gst true)"
+row "→ qa 상태 = 사장보고, 다음 Stop은 통과" "사장보고 통과" "$(bash "$G" get apps/shop status qa) $(gst true)"
+rm -f "$gd/graph-turn"; mkg shop qa 진행; touch -d '-1 hour' apps/shop/src/* 2>/dev/null
+row "Stop: 잡담 턴(표시 없음)·코드 안 바뀜 → 진행 노드여도 통과" 통과 "$(gst)"
+mkg shop ok-ui 사장대기; sleep 1; echo 'x' > apps/shop/src/app.js
+row "Stop: ★ 대기 중 앱 코드가 state.json보다 새로움 → 한 번 막힘" 막힘 "$(gst)"
+row "→ 같은 상태 stop_hook_active → 통과" 통과 "$(gst true)"
+mkg shop ok-ui 사장대기; rm -f apps/shop/src/app.js; touch -d '-1 hour' "apps/shop/state.json"; touch apps/shop/tests/run.sh
+row "(기록) git pull 흉내: ★ 대기 + 파일 시각만 새것으로(touch)" 기록 "$(gst) (시각 비교라 한 번 멈춤 — 사장 결정대로 유지)"
+row "→ 같은 상황 두 번째(stop_hook_active)" 통과 "$(gst true)"
+echo turn > "$gd/graph-turn"; mkg shop bf 진행; printf 'echo "FAILED 담기"; exit 1\n' > apps/shop/tests/run.sh
+row "Stop: bf 진행 + 테스트 실패 → 자동 루프가 막음" 막힘 "$(gst true)"
+row "→ 회차 state.json에 1" 1 "$(sed -n 's/.*"bf": {"status": "[^"]*", "retries": [0-9]*, "boss_fixes": [0-9]*, "rounds": \([0-9]*\).*/\1/p' apps/shop/state.json)"
+printf '{\n' > apps/shop/state.json
+row "Stop: 깨진 state.json → 한 번 알림(막힘)" 막힘 "$(gst)"
+row "→ stop_hook_active면 통과" 통과 "$(gst true)"
+rm -rf apps/shop; mkdir -p apps/nostate; echo x > apps/nostate/a.js
+row "Stop: 앱 파일은 바뀌었는데 state.json 없음 → 한 번 알림" 막힘 "$(gst)"
+rm -rf apps/nostate "$gd/graph-turn"
+row "guard-state: Edit로 apps/x/state.json → 막힘" 막힘 "$(run "$(edit_json "$tmp/apps/x/state.json" "x")" guard-state.sh)"
+row "guard-state: Windows 경로로 Write → 막힘" 막힘 "$(run "$(write_json 'C:\work\apps\x\state.json' "x")" guard-state.sh)"
+row "guard-state: 다른 json(Edit package.json) → 통과" 통과 "$(run "$(edit_json "$tmp/apps/x/package.json" "x")" guard-state.sh)"
+
 # ---- settings.json 등록 확인 (--settings) ----
 if [ "$1" = "--settings" ]; then
   S="$src/.claude/settings.json"
@@ -182,7 +274,7 @@ if [ "$1" = "--settings" ]; then
     PAT="$3" awk -v ev="\"$1\"" -v m="$2" '
       BEGIN { pat=ENVIRON["PAT"] }
       index($0, ev) { inev=1 }
-      inev && /"(PreToolUse|PostToolUse|Stop|SessionStart)"/ && !index($0, ev) { inev=0 }
+      inev && /"(PreToolUse|PostToolUse|Stop|SessionStart|UserPromptSubmit)"/ && !index($0, ev) { inev=0 }
       inev && /"matcher"/ { cur=$0 }
       inev && index($0, pat) && (m=="-" || index(cur, "\"" m "\"")) { found=1 }
       END { exit found ? 0 : 1 }' "$S" && echo 등록됨 || echo 없음
@@ -194,6 +286,11 @@ if [ "$1" = "--settings" ]; then
   row "등록: PreToolUse Edit|Write|MultiEdit|NotebookEdit → agent-memory-only" 등록됨 "$(has PreToolUse 'Edit|Write|MultiEdit|NotebookEdit' agent-memory-only.sh)"
   row "등록: Stop → check-approved stop" 등록됨 "$(has Stop - 'check-approved.sh\" stop')"
   row "등록: SessionStart startup → session-start" 등록됨 "$(has SessionStart startup session-start.sh)"
+  row "등록: SessionStart resume|compact|clear → session-start" 등록됨 "$(has SessionStart 'resume|compact|clear' session-start.sh)"
+  row "등록: UserPromptSubmit → graph-prompt" 등록됨 "$(has UserPromptSubmit - graph-prompt.sh)"
+  row "등록: Stop → graph-stop" 등록됨 "$(has Stop - graph-stop.sh)"
+  row "등록: Stop → check-tests stop (그대로)" 등록됨 "$(has Stop - 'check-tests.sh\" stop')"
+  row "등록: PreToolUse Edit|Write|MultiEdit → guard-state" 등록됨 "$(has PreToolUse 'Edit|Write|MultiEdit' guard-state.sh)"
   for a in qa-reviewer red-team; do
     f="$src/.claude/agents/$a.md"
     r="없음"; grep -q '^memory: project' "$f" && grep -q 'agent-memory-only.sh" '"$a" "$f" && r="등록됨"

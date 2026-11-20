@@ -6,6 +6,38 @@
 #      특정 컴퓨터 전용 경로(C:\Users\..., /Users/<이름>/, /home/<이름>/)가 있으면 막음
 # jq 없이 동작한다 (Windows Git Bash에는 jq가 없는 경우가 많다).
 # 종료 코드 2 = 막기 (stderr 내용이 Claude에게 전달된다), 0 = 통과.
+#   guard-git.sh scan apps/<앱> : (graph.sh, 공개 여부 묻기 전) 앱의 지금 파일 전체(추적 중 + 새 파일)를
+#                                 아래와 같은 비밀값 패턴·올리면 안 되는 파일로 검사. 걸리면 1 + 목록, 아니면 0.
+
+# 비밀값 패턴 (커밋 검사와 scan이 같이 쓴다). 입력: "파일: 줄" 들
+secret_grep() {
+  grep -E \
+  -e 'AKIA[0-9A-Z]{16}' \
+  -e 'AIza[0-9A-Za-z_-]{35}' \
+  -e '(sk|rk)-(live|proj|ant)?-?[A-Za-z0-9_-]{20,}' \
+  -e 'gh[pousr]_[A-Za-z0-9]{36}' \
+  -e 'xox[abpr]-[A-Za-z0-9-]{10,}' \
+  -e '-----BEGIN [A-Z ]*PRIVATE KEY-----' \
+  -e '(password|passwd|secret|api_?key|token)[[:space:]]*[:=][[:space:]]*["'"'"'][^"'"'"'$<{]{8,}["'"'"']'
+}
+
+if [ "$1" = "scan" ]; then
+  root="$(git rev-parse --show-toplevel 2>/dev/null)" || exit 1
+  cd "$root" || exit 1
+  app="${2%/}"
+  [ -d "$app" ] || { echo "$app 폴더가 없습니다." >&2; exit 1; }
+  files="$( { git -c core.quotePath=false ls-files -- "$app"; git -c core.quotePath=false ls-files --others --exclude-standard -- "$app"; } | sort -u)"
+  badf="$(printf '%s\n' "$files" | grep -E '(^|/)\.env($|\.)|\.(pem|key|p12|jks|keystore)$' | grep -Ev '(^|/)\.env\.example$')"
+  hits="$(printf '%s\n' "$files" | while IFS= read -r f; do
+    [ -f "$f" ] || continue
+    grep -IHn '' "$f" 2>/dev/null
+  done | secret_grep | cut -d: -f1,2 | head -n 5)"
+  [ -z "$badf$hits" ] && exit 0
+  echo "비밀값 검사에 걸림(값은 보이지 않게 파일:줄만):${badf:+
+$badf}${hits:+
+$hits}"
+  exit 1
+fi
 
 input="$(cat)"
 # 명령 문자열만 꺼낸다 (JSON 이스케이프된 따옴표·역슬래시를 대략 풀어 줌)
@@ -81,15 +113,7 @@ added="$(printf '%s\n' "$diffs" | awk '
   /^\+\+\+ / { f=$2; sub(/^b\//,"",f); next }
   /^\+/ && f !~ /^\.claude\/hooks\// { print f ": " substr($0,2) }')"
 
-secrets="$(printf '%s\n' "$added" | grep -E \
-  -e 'AKIA[0-9A-Z]{16}' \
-  -e 'AIza[0-9A-Za-z_-]{35}' \
-  -e '(sk|rk)-(live|proj|ant)?-?[A-Za-z0-9_-]{20,}' \
-  -e 'gh[pousr]_[A-Za-z0-9]{36}' \
-  -e 'xox[abpr]-[A-Za-z0-9-]{10,}' \
-  -e '-----BEGIN [A-Z ]*PRIVATE KEY-----' \
-  -e '(password|passwd|secret|api_?key|token)[[:space:]]*[:=][[:space:]]*["'"'"'][^"'"'"'$<{]{8,}["'"'"']' \
-  | head -n 5)"
+secrets="$(printf '%s\n' "$added" | secret_grep | head -n 5)"
 [ -n "$secrets" ] && block "비밀값으로 보이는 내용이 커밋에 들어 있습니다:
 $secrets
 → 값은 .env로 옮기고 코드에서는 환경변수로 읽으세요. (오탐이면 사장에게 확인받으세요)"

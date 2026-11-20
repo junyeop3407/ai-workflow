@@ -6,14 +6,32 @@
 # 날짜 계산을 모델에 맡기면 틀리기 쉬워 여기서 한다. 아무것도 막지 않는다(항상 exit 0). jq 없이 동작한다.
 
 input="$(cat)"
-# 새로 시작할 때만 (resume·clear·compact 에서는 다시 알리지 않음)
+#   3. (그래프) 진행 중인 앱마다 graph.sh status --short 한 줄 + 멈춤 이유 — startup·resume·compact·clear 모두에서
+#      (1·2는 새로 시작할 때만)
 src="$(printf '%s' "$input" | sed -n 's/.*"source"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' | head -n1)"
-[ -n "$src" ] && [ "$src" != "startup" ] && exit 0
 
 root="$(git rev-parse --show-toplevel 2>/dev/null)" || exit 0
 cd "$root" || exit 0
 
 msg=""
+G="$(cd "$(dirname "$0")" && pwd)/../skills/build-app/graph.sh"
+graph=""
+for s in apps/*/state.json; do
+  [ -f "$s" ] && [ -f "$G" ] || continue
+  a="$(dirname "$s")"
+  line="$(bash "$G" status "$a" --short </dev/null 2>&1)"
+  [ $? -eq 3 ] && line="[그래프 $(basename "$a")] state.json 이 깨졌습니다 — 추측해서 고치지 말고 사장에게 알리세요."
+  printf '%s' "$line" | grep -q '끝(완료)' && continue
+  graph="$graph $line /"
+done
+[ -n "$graph" ] && msg="그래프 상태(state.json의 현재 노드부터 자동으로 이어 가세요, 멈춤은 graph.md 다섯 가지뿐):$graph"
+
+if [ -n "$src" ] && [ "$src" != "startup" ]; then
+  [ -z "$msg" ] && exit 0
+  msg="$(printf '%s' "$msg" | tr '"\\\t\r\n' "'/   ")"
+  printf '{"hookSpecificOutput":{"hookEventName":"SessionStart","additionalContext":"%s"}}\n' "$msg"
+  exit 0
+fi
 
 # 1. 진행 중인 앱
 apps=""
@@ -24,7 +42,7 @@ for h in apps/*/HANDOFF.md; do
   apps="$apps $(basename "$(dirname "$h")")"
 done
 if [ -n "$apps" ]; then
-  msg="세션 시작 점검: 진행 중인 앱($apps ) — git pull 뒤 test-runner로 각 앱 테스트를 한 번 돌려 깨진 것이 있으면 다른 일보다 먼저 사장에게 알리세요."
+  msg="$msg 세션 시작 점검: 진행 중인 앱($apps ) — git pull 뒤 test-runner로 각 앱 테스트를 한 번 돌려 깨진 것이 있으면 다른 일보다 먼저 사장에게 알리세요."
 fi
 
 # 2. 주간 회고
@@ -45,7 +63,6 @@ if [ -n "$due" ]; then
 fi
 
 [ -z "$msg" ] && exit 0
-cat <<JSON
-{"hookSpecificOutput":{"hookEventName":"SessionStart","additionalContext":"$msg"}}
-JSON
+msg="$(printf '%s' "$msg" | tr '"\\\t\r\n' "'/   ")"   # JSON 이 깨지지 않게
+printf '{"hookSpecificOutput":{"hookEventName":"SessionStart","additionalContext":"%s"}}\n' "$msg"
 exit 0

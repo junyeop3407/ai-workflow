@@ -65,6 +65,12 @@
             "shell": "bash",
             "command": "bash \"$CLAUDE_PROJECT_DIR/.claude/hooks/protect-tests.sh\"",
             "timeout": 10
+          },
+          {
+            "type": "command",
+            "shell": "bash",
+            "command": "bash \"$CLAUDE_PROJECT_DIR/.claude/hooks/guard-state.sh\"",
+            "timeout": 10
           }
         ]
       },
@@ -108,6 +114,25 @@
             "shell": "bash",
             "command": "bash \"$CLAUDE_PROJECT_DIR/.claude/hooks/check-approved.sh\" stop",
             "timeout": 30
+          },
+          {
+            "type": "command",
+            "shell": "bash",
+            "command": "bash \"$CLAUDE_PROJECT_DIR/.claude/hooks/graph-stop.sh\"",
+            "timeout": 600,
+            "statusMessage": "그래프: 다음 노드·자동 루프 확인 중..."
+          }
+        ]
+      }
+    ],
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "shell": "bash",
+            "command": "bash \"$CLAUDE_PROJECT_DIR/.claude/hooks/graph-prompt.sh\"",
+            "timeout": 30
           }
         ]
       }
@@ -115,6 +140,17 @@
     "SessionStart": [
       {
         "matcher": "startup",
+        "hooks": [
+          {
+            "type": "command",
+            "shell": "bash",
+            "command": "bash \"$CLAUDE_PROJECT_DIR/.claude/hooks/session-start.sh\"",
+            "timeout": 30
+          }
+        ]
+      },
+      {
+        "matcher": "resume|compact|clear",
         "hooks": [
           {
             "type": "command",

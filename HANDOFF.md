@@ -1,9 +1,9 @@
 # HANDOFF — 다음 세션 시작 가이드
 
-마지막 갱신: 2026-11-20
+마지막 갱신: 2026-11-20 (그래프 엔지니어링)
 
 ## 1. 한 줄 요약
-이석균 선배님 특강(AI 기초)의 방식대로 앱을 만드는 **작업장 견본**이다. 사용자는 **사장**, Claude의 팀들(기획·디자인·프론트엔드·백엔드·QA)은 **직원**이고, 모든 팀의 결과물은 사장 검토를 받는다. 규칙, `/build-app` 스킬, 교차 리뷰, 훅이 준비되어 있고 아직 만든 앱은 없다. **다음 할 일: 그래프 엔지니어링 적용 (새 세션에서 사장이 프롬프트를 준다).** 첫 앱 만들기는 그 뒤.
+이석균 선배님 특강(AI 기초)의 방식대로 앱을 만드는 **작업장 견본**이다. 사용자는 **사장**, Claude의 팀들(기획·디자인·프론트엔드·백엔드·QA)은 **직원**이고, 모든 팀의 결과물은 사장 검토를 받는다. 규칙, `/build-app` 스킬, 교차 리뷰, 훅, **그래프(앱 작업이 graph.md 흐름을 따라 자동으로 흐름, 사장은 ★에서 보기만 누름)** 가 준비되어 있고 아직 만든 앱은 없다. **다음 할 일: 첫 앱 만들기 (`/build-app 만들고 싶은 것`).**
 
 ## 2. 새 세션 시작 방법
 - 인텔리제이(또는 터미널)에서 이 폴더를 열고 `claude` 실행
@@ -27,8 +27,8 @@
 | 단계 | 내용 | 상태 |
 |---|---|---|
 | 0~3 | 폴더 구조, 규칙(CLAUDE.md), `/build-app` 스킬, 훅 | ✅ 준비됨 |
-| 다음 | 그래프 엔지니어링 적용 (새 세션에서 사장이 프롬프트를 줌) | ⬜ 다음 |
-| 4 | 첫 앱 만들기 (`apps/<앱이름>/`) | ⬜ 그 뒤 |
+| 그래프 | `build-app/graph.md`(노드 32·실패 엣지·멈추는 곳 다섯·체크리스트 20 대응) + `apps/<앱>/state.json` + `graph.sh`(순서 강제) + 훅(SessionStart·UserPromptSubmit·Stop 자동 루프·state 직접 편집 막기). 사장 명령 0번(첫 잠금 자동 `auto-lock.sh`, /goal 대신 Stop 훅 자동 루프, 올리기는 Claude가 실행), 구현~QA 보고 사이 질문 0번(`ask-later.md`), 완성도 90%(필수 관문 + 점수, `graph.sh score`), bb(백엔드: JUnit + api.md 예시 `api-check.sh`, `templates/backend.sh`) → bf 순서. 시험 `test-graph.sh` 59개·`test-hooks.sh --settings` 129개 | ✅ 2026-11-20 |
+| 다음 | 첫 앱 만들기 (`apps/<앱이름>/`) | ⬜ 다음 |
 | 교차 리뷰 | Codex + Gemini CLI 리뷰 (**둘 다 필수**, 변경분 1라운드, README 참고) | ✅ 준비됨 |
 | 구조 정리 | CLAUDE.md를 rules·skills·hooks·agents로 나눔 (130 → 93줄) | ✅ 2026-11-01 |
 | 견본 파일 | 변환 전/후 실제 파일 → 요구사항·테스트 정답 (`/build-app` "견본 파일"), 실제 데이터 파일 커밋 차단(guard-git, `samples/`) | ✅ 2026-11-13 |
@@ -60,6 +60,15 @@
 ├── .claude/skills/build-app/SKILL.md      /build-app 절차 (앱 하나 한 바퀴, 기능 추가도 같은 순서)
 ├── .claude/skills/build-app/templates/    견본 파일 (파이썬으로 테스트하는 앱용 run.sh)
 ├── .claude/skills/build-app/cross-review.sh  교차 리뷰 (필수, Codex·Gemini CLI로 변경분 리뷰, snapshot 기준점)
+├── .claude/skills/build-app/graph.md      앱 흐름(노드·실패 엣지·멈추는 곳 다섯·체크리스트·점수 규칙). graph.sh가 이 표만 읽음
+├── .claude/skills/build-app/graph.sh      순서 강제·state.json 쓰기 (status/pass/fail/approve/loop/score/migrate/lint …)
+├── .claude/skills/build-app/api-check.sh  api.md 예시 요청을 로컬 서버에 보내 응답 비교 (bb 노드)
+├── .claude/skills/build-app/templates/backend.sh  백엔드 테스트 견본(JUnit → 서버 켜기 → api 확인 → 끄기, 안전장치)
+├── .claude/hooks/graph-stop.sh            Stop: 구현 자동 루프·진행 노드 두고 멈추기 막기
+├── .claude/hooks/graph-prompt.sh          UserPromptSubmit: 앱 작업이면 현재 노드 한 줄
+├── .claude/hooks/guard-state.sh           state.json 직접 편집 막기
+├── .claude/hooks/auto-lock.sh             첫 테스트 잠금 자동(한 번만, ok-tl 승인 기록 필요)
+├── .claude/hooks/test-graph.sh            그래프 시험 + 가짜 앱 이야기 표
 ├── setup/new-project/SKILL.md             "새 프로젝트 만들어 줘" 개인 스킬 (README 참고해 설치)
 ├── .claude/hooks/check-tests.sh           테스트 실패 시 커밋·완료 보고 막기
 ├── .claude/hooks/guard-git.sh             강제 푸시·기록 수정·저장소 삭제 차단, 커밋 전 비밀값·.env·절대경로 검사
@@ -90,5 +99,8 @@
 - 훅은 jq 없이 grep/sed로 동작한다(Windows Git Bash에 jq가 없는 경우가 많음).
 - 훅을 고치면 `bash .claude/hooks/test-hooks.sh --settings`로 막힘/통과 표를 다시 확인한다.
 - 승인 단어(approve-tests·.approved)가 든 Bash 명령은 막히지만, 읽기 명령·`git add <경로>`·`git commit -m "<메시지>"`는 통과한다(같은 명령에 `;` `&&` `|`로 붙은 다른 명령은 검사). 커밋 메시지는 `-m`으로 쓴다(`-F`·heredoc 메시지는 줄마다 검사돼 막힐 수 있음). 그 단어가 든 문서 수정은 sed 말고 Edit로.
-- `/goal`은 사장이 입력하는 내장 명령이다(Claude가 켤 수 없음). 4단계에서 Claude가 값을 채운 한 줄을 주면 사장이 붙여 넣는다.
+- 구현은 /goal 대신 Stop 훅 자동 루프로 돈다(사장 명령 없음). 사장이 원하면 /goal을 따로 써도 된다.
+- 자동 루프는 오래 혼자 돌아서 **Claude 사용량 한도에 걸려 중간에 멈출 수 있다.** 고장이 아니다 — 진행 상황은 state.json에 남고, 한도가 풀린 뒤 새 세션을 열면 SessionStart 훅이 현재 노드를 알려 이어 간다.
+- 그래프 시험은 Windows에서 몇 분 걸린다(`test-graph.sh` 약 10분, `test-hooks.sh` 약 3분). graph.sh 한 번에 1~4초.
+- graph-stop의 "★ 대기 중 코드가 바뀜" 알림은 수정 시각 비교라 git pull 직후 한 번 멈출 수 있다(사장 결정으로 유지, 거슬리면 내용 지문 방식으로 바꿈).
 - 사장이 준 실제 엑셀·CSV 등은 `apps/<앱>/samples/`(커밋 안 함, 그 컴퓨터에만 있음). 테스트에는 칸·형식이 같은 가짜 견본을 `tests/fixtures/`에. 그 밖의 엑셀·CSV·hwp는 guard-git이 커밋을 막는다.
