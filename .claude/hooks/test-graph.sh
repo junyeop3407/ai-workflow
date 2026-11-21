@@ -60,19 +60,24 @@ snap() { # 단계 설명, 사장 입력
 boss() { # ★ 클릭 한 번 = approve
   G approve $A "$1" "$2" >/dev/null; star=$((star+1)); [ "$phase" = impl ] && q_after=$((q_after+1)); G pass $A "$1" $3 >/dev/null; }
 
+mk() { local f; for f in "$@"; do mkdir -p "$(dirname "$A/$f")"; echo "# 가짜 $f" > "$A/$f"; done; }   # AI 노드가 내는 파일(가정)
 G init $A >/dev/null;                                   snap "init (새 앱)" "-"
+mk docs/requirements.md
 G pass $A req >/dev/null;                               snap "기획 → ★기획 검토 대기" "-"
 boss ok-req "OK";                                       snap "★기획 검토 OK → 설계안" "★ OK"
+mk docs/spec.md docs/design.md
 G pass $A opt >/dev/null; boss ok-opt "1번 안(추천)";    snap "설계안 → ★설계 선택 → 테스트 목록" "★ 1번"
+mk docs/tests.md
 G pass $A tl >/dev/null; boss ok-tl "OK";               snap "테스트 목록 → ★승인 → 테스트 코드" "★ OK"
 printf "test('F1 장바구니 담기', () => {})\n" > $A/tests/test_a.spec.ts
 G pass $A tc >/dev/null;                                snap "테스트 코드 → ⚙️ 자동 잠금 → 계획" "-"
 row "첫 잠금 자동 (tc 통과 → auto-lock, 사장 명령 없음)" "잠김+ip" "$([ -f $A/tests/.approved ] && echo 잠김)+$(cur_of shop)"
 row "잠긴 뒤 auto-lock 다시 부름 → 거부" 1 "$(rc bash "$H/auto-lock.sh" $A)"
-G pass $A ip >/dev/null
+mk docs/plan.md; G pass $A ip >/dev/null
 G approve $A ok-ip "OK, 탐색·사용성은 건너뛰기" >/dev/null; star=$((star+1)); G budget $A 0 >/dev/null; G pass $A ok-ip >/dev/null
 snap "계획 → ★계획 승인(+탐색 건너뛰기) → 디자인∥데이터" "★ OK·건너뛰기"
 row "ui ∥ dd 동시 진행" "ui:진행 dd:진행" "$(G current $A --status | paste -sd' ' -)"
+mk docs/DESIGN.md docs/mockups/home.png docs/data.md docs/api.md
 G pass $A ui >/dev/null; G pass $A dd >/dev/null
 G approve $A ok-ui "OK" >/dev/null; star=$((star+1)); G pass $A ok-ui >/dev/null
 row "합류: ok-ui만 통과 → bb 아직 시작 안 함" "ok-dd" "$(cur_of shop)"
@@ -83,7 +88,7 @@ phase=impl
 row "bb 진행 중 bf pass 시도 → 거부" 1 "$(rc G pass $A bf)"
 printf 'v=$(cat .be 2>/dev/null || echo 0); [ "$v" = 0 ] && { echo "JUnit ok, api 1/1"; exit 0; }; echo "FAILED backend — $v"; exit 1\n' > $A/tests/backend.sh
 echo "a" > $A/.pw    # Playwright(승인 테스트)는 아직 실패 — bb 통과에는 영향 없어야 함
-echo "주문 저장 안 됨" > $A/.be
+echo "주문 저장 안 됨" > $A/.be; mk docs/progress.md
 row "bb 자동 루프: 실패 → 막힘" 2 "$(gstop)"; snap "bb 자동 루프 1회 실패(Stop 훅)" "-"
 echo "가격 계산 틀림" > $A/.be
 gstop >/dev/null; snap "bb 자동 루프 2회 실패" "-"
@@ -91,6 +96,7 @@ row "bb 회차 +1씩 (2회)" 2 "$(sed -n 's/.*"bb": {"status": "[^"]*", "retries
 echo 0 > $A/.be
 row "bb: Playwright 실패여도 백엔드 테스트 통과 → 자동 pass(막고 다음 노드)" "2+cb" "$(gstop)+$(cur_of shop)"
 snap "bb 통과 → Codex 빠른 검수(cb)" "-"
+mk docs/review_codex.md
 G pass $A cb bf >/dev/null;                             snap "cb 마지막 단계 → bf" "-"
 row "bf: Playwright 실패 → 통과 안 됨(자동 루프 계속)" "2+bf" "$(gstop)+$(cur_of shop)"
 echo 0 > $A/.pw
@@ -100,13 +106,21 @@ snap "cf Codex 지적 1개 → 담당 bf로" "-"
 row "Codex 지적 → 담당 노드(bf)로만" "bf" "$(cur_of shop)"
 gstop >/dev/null;                                       snap "bf 고침 → 자동 pass → cf 다시" "-"
 G pass $A cf ug >/dev/null;                             snap "cf 마지막 단계 → 화면 점검(ug)" "-"
+mk docs/ui-check.md
 G pass $A ug >/dev/null; G pass $A tr >/dev/null;      snap "ug → ⚙️ 테스트(tr) 통과 → 리뷰(qa)" "-"
+printf '## Claude 판단\n- [틀림] 없음 — 이유: 확인함\n' > $A/docs/review.md
+row "qa: 잠금 뒤 생긴 준비 코드(tests/backend.sh)를 리뷰 안 함 → 거부" "1 qa" "$(rc G pass $A qa) $(cur_of shop)"
+printf '\n## 준비 코드 변경\n- tests/backend.sh — 괜찮음: 백엔드 테스트 실행만\n' >> $A/docs/review.md
+row "qa: 잠금 때 있던 run.sh도 첫 리뷰 대상(잠금 때 기록 안 함) → 거부" 1 "$(rc G pass $A qa)"
+printf -- '- tests/run.sh — 괜찮음: 가짜 Playwright 실행\n' >> $A/docs/review.md
+mk docs/review_result.md
 G pass $A qa >/dev/null; G pass $A cx >/dev/null; G pass $A gm >/dev/null
 snap "qa → Codex 교차 → Gemini 교차 (가정: 맞는 지적 해결)" "-"
 printf 'LCP 1.8\nCLS 0.02\n콘솔에러 0\n실패요청 0\n부하에러율 0\np99 0.4\n' > $A/docs/perf.txt
 G pass $A dv >/dev/null;                                snap "⚙️ DevTools·부하 통과 → 탐색(건너뜀) → 레드팀" "-"
 row "ex: ok-ip에서 건너뛰기 → 다시 묻지 않고 건너뜀" "건너뜀" "$(st_of shop ex)"
 printf '# 레드팀\n- [의심] [보통] 로그인 요청 횟수 — 해결: tests/test_a.spec.ts:1\n' > $A/docs/redteam.md
+mk docs/security-audit.md
 G pass $A rt >/dev/null; G pass $A sa >/dev/null;      snap "레드팀(⚙️ 표시 없음) → 보안 감사 → 점수(sc)" "-"
 # 점수 1바퀴: 체크리스트 일부 ✗ (가정)
 { for i in $(seq 1 20); do case $i in 14|15|17|18) echo "| $i | ✗ | 근거: - |" ;; 13) echo "| $i | 해당 없음 | - |" ;; *) echo "| $i | ✓ | 근거: tests/test_a.spec.ts:1 |" ;; esac; done; } > $A/docs/checklist.md
@@ -128,7 +142,7 @@ row "그 상태에서 auto-lock 다시 → 거부" 1 "$(rc bash "$H/auto-lock.sh
 cp "$tmp/.ap" $A/tests/.approved
 
 # =============== B. 거부·한도·실패 엣지 ===============
-mkstate t1 ok-req 사장대기
+mkstate t1 ok-req 사장대기; echo '# 기획서' > apps/t1/docs/requirements.md
 row "★ approve 없이 pass → 거부" 1 "$(rc G pass apps/t1 ok-req)"
 row "없는 실패 엣지(ok-req → ui) → 거부" 1 "$(rc G fail apps/t1 ok-req "x" ui)"
 out=""; for i in 1 2 3 4; do
@@ -150,6 +164,7 @@ row "ok-tl 승인 기록 없이 자동 잠금 → 거부(lock 사장보고, 잠�
 # 서버 없는 앱: dd·ok-dd·bb·cb 건너뜀 → 합류 뒤 바로 bf
 mkstate t3 ok-ip 승인; sed -i 's/"ex_budget": ""/"ex_budget": "0"/' "$(S t3)"
 for n in ui dd ok-ui ok-dd bb cb bf; do setst t3 $n 대기; done
+echo '# 디자인' > apps/t3/docs/DESIGN.md; mkdir -p apps/t3/docs/mockups; echo png > apps/t3/docs/mockups/a.png
 G skip apps/t3 dd,ok-dd,bb,cb "서버 없음" >/dev/null; G pass apps/t3 ok-ip >/dev/null; G pass apps/t3 ui >/dev/null
 G approve apps/t3 ok-ui OK >/dev/null; G pass apps/t3 ok-ui >/dev/null
 row "서버 없는 앱: 합류 뒤 바로 bf" "bf" "$(cur_of t3)"
@@ -169,6 +184,7 @@ rm -rf apps/t1 apps/t2 apps/t4 apps/t5 apps/t6 apps/t7 apps/t8 apps/t3
 # =============== C. 완성도 점수 ===============
 mkscore() { mkstate "$1" sc 진행; setst "$1" dv 건너뜀
   printf "test('F1', () => {})\n" > "apps/$1/tests/test_a.spec.ts"; bash "$H/approve-tests.sh" "apps/$1" >/dev/null
+  printf 'echo "  1 passed (0.5s)"\n' > "apps/$1/tests/run.sh"
   printf '# 레드팀\n' > "apps/$1/docs/redteam.md"; }
 cl() { # 앱, ✗ 번호들, 해당 없음 번호들
   for i in $(seq 1 20); do
@@ -224,6 +240,117 @@ row "lint: graph.md 점검 통과" 0 "$(rc G lint)"
 sed 's#| docs/data.md, docs/api.md |#| docs/data.md, docs/DESIGN.md |#' "$src/.claude/skills/build-app/graph.md" > "$tmp/bad.md"
 row "lint: ui ∥ dd 가 같은 파일을 쓰게 바꾼 graph.md → 거부" 1 "$(GRAPH_MD="$tmp/bad.md" rc bash "$GS" lint)"
 rm -rf apps/e1 apps/p1 apps/b1 apps/b2 apps/b3 apps/m1
+
+# =============== F. 검증에서 나온 4가지 (테스트 개수·준비 코드 리뷰·내는 것·건너뛰기 연쇄·표에 없는 다음) ===============
+# F1. 테스트 개수: 실행 결과에서 통과 수 ≥ 승인된 테스트 수, 건너뜀 0, 0개 아님. 못 읽으면 통과 아님
+mkcnt() { # 앱, run.sh 내용 — 승인된 테스트 2개(a, b)를 잠그고 tr 진행
+  mkstate "$1" tr 진행
+  printf "test('a', () => {})\ntest('b', async () => {})\n" > "apps/$1/tests/a.spec.ts"
+  bash "$H/approve-tests.sh" "apps/$1" >/dev/null
+  printf '%s\n' "$2" > "apps/$1/tests/run.sh"
+}
+mkcnt c1 'exit 0'
+row "tr: run.sh를 exit 0으로 위조(출력 없음) → 거부" "1 tr" "$(rc G pass apps/c1 tr) $(cur_of c1)"
+mkcnt c2 'printf "  1 skipped\n  1 passed (1.0s)\n"; exit 0'
+row "tr: 테스트 하나 skip(1 passed, 1 skipped) → 거부" "1 tr" "$(rc G pass apps/c2 tr) $(cur_of c2)"
+mkcnt c3 'echo "모두 좋음"; exit 0'
+row "tr: 개수를 못 읽음 → 거부" "1 tr" "$(rc G pass apps/c3 tr) $(cur_of c3)"
+mkcnt c4 'printf "  1 passed (1.0s)\n"; exit 0'
+row "tr: 통과 1 < 승인된 테스트 2 → 거부" "1 tr" "$(rc G pass apps/c4 tr) $(cur_of c4)"
+mkcnt c5 'printf "Running 2 tests using 1 worker\n  2 passed (1.2s)\n"; exit 0'
+row "tr: 정상(2 passed = 승인 2) → 통과" "0 qa" "$(rc G pass apps/c5 tr) $(cur_of c5)"
+G pass apps/c2 tr 2>&1 | grep -q '건너뜀' && m=있음 || m=없음
+row "→ 거부 메시지에 건너뜀 개수가 보임" 있음 "$m"
+mkcnt c6 'exit 0'; G fail apps/c6 tr "x" bf >/dev/null 2>&1; echo '| 회차 |' > apps/c6/docs/progress.md
+row "bf 자동 루프: run.sh exit 0 → 통과 아님(20)" 20 "$(rc G loop apps/c6)"
+mkscore c7; cl c7 "" ""; printf 'exit 0\n' > apps/c7/tests/run.sh
+row "sc 필수 관문: run.sh exit 0(개수 없음) → bf로" "bf" "$(G score apps/c7 >/dev/null 2>&1; cur_of c7)"
+rm -rf apps/c1 apps/c2 apps/c3 apps/c4 apps/c5 apps/c6 apps/c7
+# 출력 형식별 개수 읽기 (graph.sh tcount: 표준 입력 → "통과 N 건너뜀 N 실패 N 형식 N")
+tc_of() { printf '%b' "$1" | bash "$GS" tcount 2>/dev/null; }
+row "개수: Playwright" "통과 3 건너뜀 1 실패 0 형식 1" "$(tc_of '  1 skipped\n  3 passed (2.1s)\n')"
+row "개수: Vitest" "통과 2 건너뜀 1 실패 0 형식 1" "$(tc_of ' Test Files  1 passed (1)\n      Tests  2 passed | 1 skipped (3)\n')"
+row "개수: pytest" "통과 4 건너뜀 1 실패 0 형식 1" "$(tc_of '....s\n===== 4 passed, 1 skipped in 0.12s =====\n')"
+row "개수: pytest -q" "통과 2 건너뜀 0 실패 0 형식 1" "$(tc_of '..\n2 passed in 0.01s\n')"
+row "개수: JUnit(Maven, 마지막 합계 줄)" "통과 5 건너뜀 1 실패 0 형식 1" "$(tc_of 'Tests run: 3, Failures: 0, Errors: 0, Skipped: 1, Time elapsed: 0.1 s - in a.ATest\nResults:\nTests run: 6, Failures: 0, Errors: 0, Skipped: 1\n')"
+row "개수: JUnit(Gradle testLogging)" "통과 2 건너뜀 1 실패 0 형식 1" "$(tc_of 'ItemTest > create() PASSED\nItemTest > list() PASSED\nItemTest > old() SKIPPED\n')"
+row "개수: Jest" "통과 2 건너뜀 1 실패 0 형식 1" "$(tc_of 'Tests:       1 skipped, 2 passed, 3 total\n')"
+row "개수: node --test" "통과 3 건너뜀 1 실패 0 형식 1" "$(tc_of 'ℹ tests 4\nℹ pass 3\nℹ fail 0\nℹ skipped 1\nℹ todo 0\n')"
+row "개수: 두 도구(Vitest + Playwright) 합침" "통과 5 건너뜀 0 실패 0 형식 2" "$(tc_of '      Tests  2 passed (2)\n  3 passed (1.0s)\n')"
+row "개수: 못 읽음" "통과 0 건너뜀 0 실패 0 형식 0" "$(tc_of 'ok\n')"
+
+# F2. 준비 코드(run.sh·conftest.py·fixtures·playwright.config)가 바뀌면 qa가 그 diff를 보게
+mkstate q1 qa 진행; printf "test('a', () => {})\n" > apps/q1/tests/a.spec.ts; bash "$H/approve-tests.sh" apps/q1 >/dev/null
+echo 'import pytest' > apps/q1/tests/conftest.py   # 잠금 뒤 생긴 준비 코드
+printf '## Claude 판단\n- [틀림] 없음 — 이유: 확인함\n' > apps/q1/docs/review.md
+row "qa: 준비 코드 기록 없음(첫 리뷰) + review.md에 준비 코드 절 없음 → 거부" "1 qa" "$(rc G pass apps/q1 qa) $(cur_of q1)"
+G pass apps/q1 qa 2>&1 | grep -q 'tests/run.sh' && m=있음 || m=없음
+row "→ 거부 메시지에 볼 파일(tests/run.sh)이 보임" 있음 "$m"
+printf '\n## 준비 코드 변경\n- tests/run.sh — 괜찮음: 실행만\n' >> apps/q1/docs/review.md
+row "→ 절은 있는데 tests/conftest.py 빠짐 → 거부" 1 "$(rc G pass apps/q1 qa)"
+printf -- '- tests/conftest.py — 괜찮음: import만\n' >> apps/q1/docs/review.md
+row "→ 바뀐 준비 코드를 모두 적음 → 통과(cx)" "0 cx" "$(rc G pass apps/q1 qa) $(cur_of q1)"
+back_to_qa() { sed -i -E 's/"current": \[[^]]*\]/"current": ["qa"]/; s/^(    "qa": \{"status": )"[^"]*"/\1"진행"/' "$(S q1)"; }
+back_to_qa; printf '## Claude 판단\n- [틀림] 없음 — 이유: 확인함\n' > apps/q1/docs/review.md
+row "qa 다시: 지난 리뷰 뒤 준비 코드 안 바뀜 → 절 없어도 통과" "0 cx" "$(rc G pass apps/q1 qa) $(cur_of q1)"
+back_to_qa; echo '# 기다리는 시간 늘림' >> apps/q1/tests/run.sh
+row "qa 다시: run.sh 바뀜 → 절 없으면 거부" 1 "$(rc G pass apps/q1 qa)"
+mkdir -p apps/q1/tests/fixtures; echo '{}' > apps/q1/tests/fixtures/a.json; echo 'export default {}' > apps/q1/playwright.config.ts
+printf '\n## 준비 코드 변경\n- tests/run.sh — 괜찮음\n' >> apps/q1/docs/review.md
+row "→ fixtures·playwright.config도 새로 생김 → 빠지면 거부" 1 "$(rc G pass apps/q1 qa)"
+printf -- '- tests/fixtures/a.json — 괜찮음\n- playwright.config.ts — 괜찮음\n' >> apps/q1/docs/review.md
+row "→ 모두 적으면 통과" 0 "$(rc G pass apps/q1 qa)"
+rm -rf apps/q1
+# 보안 리뷰 지적: 경로 정규식 끼워 넣기, 점 파일·러너 설정 빠짐
+mkstate q2 qa 진행; printf "test('a', () => {})\n" > apps/q2/tests/a.spec.ts; bash "$H/approve-tests.sh" apps/q2 >/dev/null
+echo 'exit 0' > 'apps/q2/tests/a+b.sh'
+printf '## 준비 코드 변경\n- tests/run.sh — 괜찮음\n- tests/aab.sh — 괜찮음\n' > apps/q2/docs/review.md
+row "qa: 파일 a+b.sh 대신 aab.sh를 적음(정규식처럼 맞춰짐) → 거부" 1 "$(rc G pass apps/q2 qa)"
+printf -- '- tests/a+b.sh — 괜찮음\n' >> apps/q2/docs/review.md
+echo 'export X=1' > apps/q2/tests/.setup.sh
+row "qa: 점으로 시작하는 준비 코드(tests/.setup.sh) → 적어야 함" 1 "$(rc G pass apps/q2 qa)"
+printf -- '- tests/.setup.sh — 괜찮음\n' >> apps/q2/docs/review.md
+echo '{"scripts":{"test":"exit 0"}}' > apps/q2/package.json; echo 'test {}' > apps/q2/build.gradle
+row "qa: 러너 설정(package.json·build.gradle) → 적어야 함" 1 "$(rc G pass apps/q2 qa)"
+printf -- '- package.json — 괜찮음\n- `build.gradle` — 괜찮음\n' >> apps/q2/docs/review.md
+row "→ 모두 적으면 통과(경로에 백틱 있어도 같은 경로로 셈)" 0 "$(rc G pass apps/q2 qa)"
+rm -rf apps/q2
+
+# F3. AI 노드 "내는 것" 파일이 있고 비어 있지 않아야 pass
+mkstate o1 req 진행
+row "req: requirements.md 없이 pass → 거부" "1 req" "$(rc G pass apps/o1 req) $(cur_of o1)"
+: > apps/o1/docs/requirements.md
+row "req: requirements.md가 빈 파일 → 거부" 1 "$(rc G pass apps/o1 req)"
+printf '# 기획서\n' > apps/o1/docs/requirements.md
+row "req: requirements.md 있음 → 통과(ok-req)" "0 ok-req" "$(rc G pass apps/o1 req) $(cur_of o1)"
+mkstate o2 ui 진행; echo '# 디자인' > apps/o2/docs/DESIGN.md; mkdir -p apps/o2/docs/mockups
+row "ui: 시안 폴더(docs/mockups/)가 비어 있음 → 거부" 1 "$(rc G pass apps/o2 ui)"
+echo png > apps/o2/docs/mockups/home.png
+row "ui: 시안 파일 있음 → 통과" 0 "$(rc G pass apps/o2 ui)"
+mkstate o3 dep 진행
+row "dep: 파일이 아닌 칸(공개 주소)은 확인 안 함 → 통과" 0 "$(rc G pass apps/o3 dep)"
+rm -rf apps/o1 apps/o2 apps/o3
+
+# F4. 건너뛰기 연쇄: 같은 이유("서버 없음"/"화면 없음")를 가진 노드를 함께 건너뜀
+mkk() { mkstate "$1" ok-ip 승인; sed -i 's/"ex_budget": ""/"ex_budget": "0"/' "$(S "$1")"
+  for n in ui dd ok-ui ok-dd bb cb bf ug; do setst "$1" $n 대기; done; }
+mkk k1; G skip apps/k1 bb "서버 없음" >/dev/null
+row "bb만 건너뛰기(서버 없음) → dd·ok-dd·cb도 건너뜀" "건너뜀 건너뜀 건너뜀" "$(st_of k1 dd) $(st_of k1 ok-dd) $(st_of k1 cb)"
+echo '# 디자인' > apps/k1/docs/DESIGN.md; mkdir -p apps/k1/docs/mockups; echo png > apps/k1/docs/mockups/a.png
+G pass apps/k1 ok-ip >/dev/null; G pass apps/k1 ui >/dev/null; G approve apps/k1 ok-ui OK >/dev/null; G pass apps/k1 ok-ui >/dev/null
+row "→ 합류 뒤 bf로" "bf" "$(cur_of k1)"
+mkk k2; G skip apps/k2 ui "화면 없음" >/dev/null
+row "ui만 건너뛰기(화면 없음) → ok-ui·ug도 건너뜀, 서버 쪽은 그대로" "건너뜀 건너뜀 대기" "$(st_of k2 ok-ui) $(st_of k2 ug) $(st_of k2 bb)"
+rm -rf apps/k1 apps/k2
+
+# F5. pass에 표에 없는 다음 노드를 주면 거부
+mkstate n1 sa 진행; echo '# 보안 감사' > apps/n1/docs/security-audit.md
+row "sa 다음에 표에 없는 bf → 거부, 그대로 sa" "1 sa" "$(rc G pass apps/n1 sa bf) $(cur_of n1)"
+row "sa 다음에 없는 노드 zzz → 거부" 1 "$(rc G pass apps/n1 sa zzz)"
+row "sa 다음에 표에 있는 sc → 통과" "0 sc" "$(rc G pass apps/n1 sa sc) $(cur_of n1)"
+mkstate n2 ok-req 사장대기; G approve apps/n2 ok-req OK >/dev/null
+row "★ ok-req 다음에 표에 없는 bf → 거부" 1 "$(rc G pass apps/n2 ok-req bf)"
+rm -rf apps/n1 apps/n2
 
 # =============== E. api-check.sh · backend.sh (가짜 서버 = node) ===============
 if command -v node >/dev/null 2>&1; then

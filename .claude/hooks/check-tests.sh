@@ -8,7 +8,7 @@
 #   현재 노드가 bb·cb(백엔드 구현 중)  → "백엔드 테스트: `명령`" 줄 (없으면 테스트 실행 줄)
 #   그 밖, 또는 state.json 없음·깨짐     → "테스트 실행:" 줄 (안전한 쪽)
 #   stop 모드에서 bb·bf가 "진행"이면 그 앱은 건너뛴다 — graph-stop.sh 자동 루프가 같은 검사를 한다(두 번 안 돌림).
-#   check-tests.sh app apps/<앱> [백엔드] : (graph.sh) 그 앱의 줄을 바로 실행. 0 통과 / 1 실패·줄 없음
+#   check-tests.sh app apps/<앱> [백엔드] : (graph.sh) 그 앱의 줄을 바로 실행하고 출력 전체를 보여 줌. 0 통과 / 1 실패·줄 없음
 # 종료 코드 2 = 막기 (stderr 내용이 Claude에게 전달된다), 0 = 통과.
 
 mode="$1"
@@ -39,7 +39,7 @@ if [ "$mode" = "app" ]; then
   app="${2%/}"; app="${app#apps/}"
   key="테스트 실행"; [ "$3" = "백엔드" ] && key="백엔드 테스트"
   run_app "$app" "$key"; rc=$?
-  printf '%s\n' "$RUN_OUT" | tail -n 40
+  printf '%s\n' "$RUN_OUT"   # 전체 출력: graph.sh가 테스트 개수를 읽는다(Gradle은 테스트마다 한 줄)
   [ $rc -eq 0 ] && exit 0
   exit 1
 fi

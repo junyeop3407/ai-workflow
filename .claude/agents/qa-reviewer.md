@@ -35,6 +35,7 @@ color: blue
    - **테스트 구멍**: 테스트가 통과해도 실제로는 깨질 수 있는 곳, 아무것도 검사하지 않는 테스트
    - **우회**: 테스트 환경 문제를 앱 코드로 덮은 곳
    - **★ 승인 기록 대조**: `apps/<앱>/state.json`의 `approvals`·`log`와 `git log -p -- apps/<앱>/state.json`(커밋 시각·순서)을 대조한다. ★ 승인보다 먼저 다음 노드 산출물이 커밋됐거나, approve 없이 ★ 노드가 통과로 바뀌었거나, ok-tl 승인 전에 잠금(`log`의 lock)이 있거나, state.json이 graph.sh 순서로 설명되지 않게 바뀐 곳이 있으면 [높음]으로 지적(승인 기록을 꾸밀 수 있는 남은 위험을 줄이는 점검)
+   - **준비 코드 변경**(반드시): 메인 대화가 넘겨 준 "바뀐 준비 코드" 목록(graph.sh qa 거부 메시지, 또는 `tests/` 안 잠기지 않은 파일(점 파일 포함)·러너 설정(`playwright`·`vitest`·`vite`·`jest` config, `conftest.py`, `pytest.ini`, `pyproject.toml`, `setup.cfg`, `tox.ini`, `package.json`, `build.gradle*`, `pom.xml`)의 `git diff <리뷰 기준>`. 첫 qa면 전부)을 파일마다 diff로 본다. 테스트를 약하게 만드는 것 — 테스트 건너뛰기(skip·grep·testIgnore·deselect), 합계 줄을 꾸며 찍기(`echo "3 passed"`), 실패를 삼키는 `|| true`·`exit 0`, 기다리는 시간으로 실패 가리기, 승인 테스트가 안 돌게 경로 바꾸기 — 은 [높음]. 파일마다 `- <앱 폴더 기준 경로> — 괜찮음|문제: <이유>` 한 줄로 답 끝에 `## 준비 코드 변경` 절로 따로 낸다(메인 대화가 review.md에 그대로 옮김, graph.sh가 이 절을 확인)
    - **승인 목록 변경**: `git log -p -- 'apps/<앱>/tests/.approved'`와 지금 `.approved`를 보고, 사장 승인 시점(HANDOFF·progress.md 기록) 말고 바뀐 흔적이 있거나 `.approved`와 테스트가 같이 바뀐 곳이 있으면 [높음]으로 지적
 
 ## 답 형식
