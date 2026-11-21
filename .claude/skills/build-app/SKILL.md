@@ -111,7 +111,7 @@ ECC 플러그인(`ecc:` 이름)은 아래 표에 적힌 것만 쓴다. ECC의 �
 "구현 → 테스트 → 실패한 것만 고치기"를 Claude가 혼자 반복하게 하는 장치. 다섯 칸: **목표**(노드 통과 조건) · **채점표**(bb = `백엔드 테스트:` 줄, bf = 승인된 테스트 전체 + 해시) · **일지**(`progress.md`) · **브레이크**(15회·같은 실패 3연속) · **잠금**(`.approved` + 훅).
 1. 시작 전에 `cross-review.sh snapshot apps/<앱>`으로 기준점을 찍어 `progress.md` 맨 위 "단계 1 기준: <해시>"로 적는다(Codex 빠른 검수용). 4단계 시작 직전 커밋은 HANDOFF `리뷰 기준:`에.
 2. **자동 루프**: 응답을 끝내려 할 때마다 Stop 훅(`graph-stop.sh` → `graph.sh loop`)이 그 노드의 통과 검사를 직접 돌린다. 실패면 막고 "실패한 테스트·한 줄 원인 → 계속 고쳐라"를 돌려주고 회차를 state.json에 센다. 통과면 자동으로 `pass` → 다음 노드(cb·cf)를 시작하라고 알린다. 사장 명령은 필요 없다. (사장이 원하면 /goal을 따로 써도 된다.)
-   - **bb(백엔드)**: 앱 HANDOFF에 `백엔드 테스트: \`bash tests/backend.sh\``. 견본 `templates/backend.sh`를 복사(JUnit → 서버 켜기 → `docs/api.md` 예시 확인(`api-check.sh`) → 서버 끄기, 포트 사용 중·시간 초과·Ctrl+C 안전장치). 승인된 Playwright 테스트는 bb 통과 조건이 아니다. 백엔드 부품 테스트(JUnit)는 QA팀이 bb 시작 때 추가한다. 이때 **구조 검사 테스트(ArchUnit `ArchitectureTest`)**도 함께 넣어 SOLID 위반이 있으면 `./gradlew test`가 실패하게 한다(`.claude/rules/backend-solid.md` "언제 확인하나").
+   - **bb(백엔드)**: 앱 HANDOFF에 `백엔드 테스트: \`bash tests/backend.sh\``. 견본 `templates/backend.sh`를 복사(JUnit → 서버 켜기 → `docs/api.md` 예시 확인(`api-check.sh`) → 서버 끄기, 포트 사용 중·시간 초과·Ctrl+C 안전장치). 승인된 Playwright 테스트는 bb 통과 조건이 아니다. 백엔드 부품 테스트(JUnit)는 QA팀이 bb 시작 때 추가한다. 이때 **구조 검사 테스트**(견본 `templates/ArchitectureTest.java`를 복사해 `package`·`ROOT`만 고침)도 함께 넣어 SOLID 위반이 있으면 `./gradlew test`가 실패하게 한다(`.claude/rules/backend-solid.md` "언제 확인하나").
    - **bf(프론트)**: `테스트 실행:` 줄(승인된 테스트 전체) + 잠금 해시. api.md를 보고 붙인다.
    - 서버 없는 앱은 `graph.sh skip apps/<앱> dd,ok-dd,bb,cb "서버 없음"`(ok-ip 전에) → 합류 뒤 바로 bf.
 3. **일지** `apps/<앱>/docs/progress.md` — 매 회차 한 줄 추가(커밋 전에도 파일로 남아 새 세션이 이어 받는다):

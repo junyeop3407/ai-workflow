@@ -79,7 +79,7 @@ infra/      → 결제·메일·파일 저장·외부 API 같은 바깥 연결�
 | 때 | 누가 | 무엇을 |
 |---|---|---|
 | bb 구현 중, 클래스를 새로 만들거나 고칠 때마다 | 백엔드팀 | 위 "위반 신호"를 스스로 확인하고 짠다 |
-| bb 시작 때 | QA팀 | JUnit 안에 **구조 검사 테스트**를 넣는다(ArchUnit, `src/test/.../ArchitectureTest.java`): ① 컨트롤러는 리포지토리를 직접 부르지 않음 ② 필드 주입(`@Autowired` 필드) 없음 ③ 서비스·도메인은 `controller`·`infra` 패키지를 모름 ④ 패키지 순환 없음. ArchUnit API는 **context7로 그 버전 문서를 먼저 확인**한다. 이 테스트는 `백엔드 테스트:` 줄(`./gradlew test`)에 함께 돌아, 위반하면 bb가 통과하지 않는다 |
+| bb 시작 때 | QA팀 | 견본 `.claude/skills/build-app/templates/ArchitectureTest.java`를 `src/test/java/<최상위 패키지>/`에 복사하고 `package`·`ROOT`만 고친다(ArchUnit, `testImplementation 'com.tngtech.archunit:archunit-junit5:<버전>'`). 검사: ① 컨트롤러는 리포지토리를 직접 부르지 않음 ② 필드 주입(`@Autowired`·`@Value` 필드) 없음 ③ 서비스·도메인은 `controller`·`infra` 패키지를 모름 ④ 서비스·도메인은 HTTP 타입을 모름 ⑤ 도메인은 서비스를 모름 ⑥ 기능 패키지 순환 없음. 버전은 **context7로 최신을 다시 확인**한다. 이 테스트는 `백엔드 테스트:` 줄(`./gradlew test`)에 함께 돌아, 위반하면 bb가 통과하지 않는다 |
 | cb·cx·gm (Codex·Gemini 검수) | `cross-review.sh` | 자바 변경분에 SOLID 위반 신호도 보라고 요청한다 |
 | 5단계 qa | `qa-reviewer` | 바뀐 자바 파일에서 위반 신호를 찾아 `[중간]`으로 지적(`원칙: S/O/L/I/D` 표시). 테스트 실패로 이어지는 것은 `[높음]` |
 
