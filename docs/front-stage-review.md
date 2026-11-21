@@ -1,6 +1,8 @@
 # 앞단계(사람이 정하는 단계) 보완 분석
 
-작성: 2026-11-22 · 상태: **사장 검토 대기** (아직 규칙·스킬에 반영하지 않음)
+작성: 2026-11-22 · 상태: **①~⑧ 반영함**(사장 OK, 2026-11-22) · 아래 "6. 추가로 찾은 것" ⑨~⑬은 **사장 검토 대기**
+
+반영한 곳: ①②⑦ `build-app/SKILL.md` "기획 인터뷰" + `templates/requirements.md` · ③ `doc-review.sh`(Gemini=agy) · ④ "사전 부검" + `docs/premortem.md` · ⑤ 수용 기준 `F1-1` · ⑥ `graph.sh` 검사 `req`·`trace`·`undecided`(시험 `test-graph.sh` G절) · ⑧ "★ 검토 요청 틀" + CLAUDE.md
 
 "앞단계"는 사장이 무엇을 만들지 정하는 구간이다: `req → ★기획 검토 → opt → ★설계 선택 → tl → ★테스트 승인 → ip → ★계획 승인 → ui·dd → ★디자인·데이터 검토`.
 이 뒤는 자동 루프라서, 앞단계에서 빠진 것은 뒤에서 고치느라 몇 배로 비싸진다. 레퍼런스들이 공통으로 말하는 것도 같다: **사람의 일은 "무엇을 왜 만들지 정하고, 결과를 검증하는 것"**이다.
@@ -81,6 +83,20 @@
 - ⑦·⑧은 ②·①을 넣을 때 같이 들어가는 작은 변경.
 - 늘어나는 사장 부담: 질문이 몇 개 늘지만 모두 클릭 보기, 대신 구현 뒤 "아직이에요" 왕복이 줄어든다.
 
+## 6. 추가로 찾은 것 (⑨~⑬, 사장 검토 대기)
+
+| # | 레퍼런스 | 지금 빈 곳 | 보완안 | 크기 |
+|---|---|---|---|---|
+| ⑨ | Example Mapping (Matt Wynne, BDD) — 규칙(파랑)·예시(초록)·질문(빨강) 카드 | 수용 기준이 규칙 문장뿐이라 "얼마나·어떤 값"이 모호할 수 있음 | 수용 기준마다 **구체 예시 하나**: `F1-1 … — 예: 사과 2개 담기 → 장바구니 2`. 테스트가 예시 값을 그대로 씀. 답 못 한 질문은 점검표 `묻기`로 | 작음(견본·인터뷰 한 줄) |
+| ⑩ | Amazon Working Backwards (PR/FAQ) | 한 줄 요약만 있어 "사용자에게 무엇이 좋아지나"가 약할 수 있음. 만드는 중 범위가 커져도 잡을 기준이 없음 | 기획서 맨 위에 **사용자에게 보내는 출시 안내문 3문장 + 예상 질문 3개**. ok-qa 때 "안내문에 없는 걸 만들었나(과잉)"를 같이 확인 | 작음 |
+| ⑪ | User Story Mapping (Jeff Patton) — 걸어 다니는 뼈대·릴리스 자르기 | 첫 버전 범위를 "하지 않을 것"으로만 정함 | 첫 버전 = **처음부터 끝까지 한 번 도는 가장 작은 흐름**. 기능에 `1차/나중` 표시, `나중`은 테스트·구현에서 빠짐 | 중간(graph.sh 대조 검사가 `나중` 기능을 빼야 함) |
+| ⑫ | Kano 모델 — 꼭 있어야(must-be)·많을수록 좋음·있으면 놀람 | 기능 우선순위 기준이 없음 | 인터뷰에서 기능마다 셋 중 하나를 고르게 → 1차는 "꼭" + 핵심 "많을수록", "놀람"은 나중 후보. ⑪과 한 번에 | 작음(⑪과 함께) |
+| ⑬ | 저충실도 시제품(종이·와이어프레임) + 실밸 43번(UI는 서비스의 지도) | 화면 모양은 4단계 디자인에서야 처음 봄 → 기획 단계에서 흐름이 틀려도 늦게 발견 | ★기획 검토 때 **손그림 수준 화면 초안**(회색 상자 HTML 한 장 캡처, 디자인 아님)을 함께 보여 줌 | 중간(캡처 단계 추가) |
+
+이미 있는 것과 겹쳐서 넣지 않을 것: Definition of Ready(INVEST) — req·trace·undecided 검사가 사실상 "구현 시작 준비 점검" 역할을 한다.
+
+**직원 추천**: ⑨·⑩·⑫는 기획서 견본과 인터뷰에 몇 줄 넣는 작은 일이라 바로 넣고, ⑪은 graph.sh 대조 검사를 고쳐야 해서 ⑫와 묶어 그다음, ⑬은 사장이 "화면을 일찍 보고 싶다"면 넣는다.
+
 ## 출처
 - 사장 제공: 실밸개발자 유튜브 영상 분석 정리본, 보스턴빌더 영상별 정리본(전체 목차), 토비의 스프링 영상 분석 정리본(종합 정리) — 2026-11-21 작성본
 - Anthropic, Claude Code Best practices: https://code.claude.com/docs/en/best-practices
@@ -89,3 +105,9 @@
 - Kiro Specs: https://kiro.dev/docs/specs/concepts · EARS: https://en.wikipedia.org/wiki/Easy_Approach_to_Requirements_Syntax
 - Shape Up, Write the Pitch: https://basecamp.com/shapeup/1.5-chapter-06
 - Gary Klein, pre-mortem: https://www.psychologytoday.com/ie/blog/seeing-what-others-dont/202101/the-pre-mortem-method
+- Example Mapping: https://cucumber.io/blog/example-mapping-introduction · https://automationpanda.com/2018/02/27/bdd-example-mapping/
+- Working Backwards: https://www.allthingsdistributed.com/2006/11/working_backwards.html · https://productschool.com/blog/product-fundamentals/prfaq
+- User Story Mapping: https://www.oreilly.com/library/view/user-story-mapping/9781491904893/ch16.html
+- Kano 모델: https://www.surveymonkey.com/learn/market-research/kano-model-prioritize-features
+- 저충실도 시제품: https://ux.byu.edu/low-fidelity-prototyping · https://open.oregonstate.education/setextbook/chapter/paper-prototyping/
+- Definition of Ready: https://www.atlassian.com/agile/project-management/definition-of-ready

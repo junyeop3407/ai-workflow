@@ -333,6 +333,53 @@ perf_check() { # 결과: 줄마다 "ok|fail 이름 담당 설명"
       && echo "ok $k $own $v" || echo "fail $k $own $v(기준 $lim)"
   done
 }
+# 기획 문서 검사 (graph.md "기획서 검사"·"대조 검사"·"안 정한 것 검사")
+sec_lines() { # 파일, 절 이름 → 그 절 아래 "- " 줄(앞 공백 포함 그대로)
+  [ -f "$1" ] || return 0
+  awk -v h="## $2" 'index($0,h)==1 { f=1; next } /^## / { f=0 } f && /^[[:space:]]*- /' "$1"
+}
+feat_ids() { sec_lines "$APPDIR/docs/requirements.md" "꼭 되어야 할 기능" | sed -n 's/^[[:space:]]*- \(F[0-9][0-9-]*\).*/\1/p'; }
+leaf_ids() { # 수용 기준이 있는 기능은 수용 기준 번호만, 없는 기능은 기능 번호
+  local all; all="$(feat_ids)"
+  printf '%s\n' "$all" | awk 'NF { ids[NR]=$0; n=NR } END { for (i=1;i<=n;i++) { c=0; for (j=1;j<=n;j++) if (index(ids[j], ids[i] "-")==1) c=1; if (!c) print ids[i] } }'
+}
+req_ok() {
+  local r="$APPDIR/docs/requirements.md" bad="" f
+  [ -n "$(sec_lines "$r" "성공 기준")" ] || bad="$bad '## 성공 기준' 줄 없음;"
+  [ -n "$(sec_lines "$r" "빈칸 점검표")" ] || bad="$bad '## 빈칸 점검표' 줄 없음;"
+  sec_lines "$r" "빈칸 점검표" | grep -q '묻기' && bad="$bad 빈칸 점검표에 '묻기' 남음($(sec_lines "$r" "빈칸 점검표" | grep '묻기' | sed 's/^[[:space:]]*- //' | cut -c1-30 | paste -sd, -));"
+  [ -n "$(feat_ids)" ] || bad="$bad '## 꼭 되어야 할 기능'에 F번호 없음;"
+  for f in $(feat_ids | grep -v -- '-'); do
+    feat_ids | grep -q "^$f-" || bad="$bad $f 수용 기준(${f}-1 …) 없음;"
+  done
+  if [ -f "$APPDIR/docs/review_req.md" ] && ! sec_lines "$APPDIR/docs/review_req.md" "Gemini 지적" | grep -q . ; then :
+  elif [ -f "$APPDIR/docs/review_req.md" ] && [ -z "$(sec_lines "$APPDIR/docs/review_req.md" "Claude 판단")" ]; then
+    bad="$bad review_req.md '## Claude 판단'이 비어 있음(지적마다 [맞음|틀림|사장 확인] 한 줄);"
+  fi
+  [ -z "$bad" ] && return 0; REQ_MSG="기획서(docs/requirements.md) 검사 실패:$bad"; return 1
+}
+trace_ok() {
+  local t="$APPDIR/docs/tests.md" bad="" id leaves
+  leaves="$(leaf_ids)"
+  [ -n "$leaves" ] || { TRACE_MSG="requirements.md에 F번호가 없습니다."; return 1; }
+  for id in $leaves; do
+    [ -f "$t" ] && grep -Eq "^[[:space:]]*- $id[[:space:]]+→" "$t" || bad="$bad $id;"
+  done
+  [ -n "$bad" ] && bad=" 테스트가 없는 번호:$bad"
+  if [ -f "$t" ]; then
+    for id in $(sed -n 's/^[[:space:]]*- \(F[0-9][0-9-]*\)[[:space:]]*→.*/\1/p' "$t"); do
+      printf '%s\n' "$leaves" | grep -qx "$id" || bad="$bad 기획서에 없는 번호: $id;"
+    done
+  fi
+  [ -z "$bad" ] && return 0; TRACE_MSG="기획서 ↔ 테스트 목록 대조 실패:$bad"; return 1
+}
+undecided_ok() {
+  local left
+  left="$(sec_lines "$APPDIR/docs/spec.md" "아직 안 정한 것" | sed 's/^[[:space:]]*- //' | grep -v '^없음' | grep -v '나중:')"
+  [ -z "$left" ] && return 0
+  UND_MSG="spec.md '아직 안 정한 것'에 구현 전에 정할 것이 남았습니다(사장에게 물어 정하거나 '나중: <이유>'):
+$(printf '%s\n' "$left" | sed 's/^/  - /')"; return 1
+}
 redteam_ok() { [ ! -f "$APPDIR/.redteam-needed" ] && [ -f "$APPDIR/docs/redteam.md" ]; }
 secrets_ok() { SECRET_OUT="$(bash "$HOOKS/guard-git.sh" scan "$APPDIR" </dev/null 2>&1)"; }
 run_check() { # 노드의 ⚙️ 검사. 실패면 CHECK_MSG 와 함께 1
@@ -348,6 +395,9 @@ $(printf '%s\n' "$TEST_OUT" | tail -n 15)"; return 1; } ;;
     redteam) redteam_ok || { CHECK_MSG=".redteam-needed 표시가 남아 있거나 docs/redteam.md가 없습니다."; return 1; } ;;
     secrets) secrets_ok || { CHECK_MSG="비밀값 검사에 걸렸습니다:
 $SECRET_OUT"; return 1; } ;;
+    req) req_ok || { CHECK_MSG="$REQ_MSG"; return 1; } ;;
+    trace) trace_ok || { CHECK_MSG="$TRACE_MSG"; return 1; } ;;
+    undecided) undecided_ok || { CHECK_MSG="$UND_MSG"; return 1; } ;;
     score) CHECK_MSG="sc는 graph.sh score 로만 통과합니다."; return 1 ;;
     *) CHECK_MSG="graph.md의 모르는 검사: $key"; return 1 ;;
   esac
@@ -701,8 +751,10 @@ cmd_score() {
     perf_check | while read -r mark k own rest; do printf '%s\t%s\t성능 %s %s\n' "$mark" "$own" "$k" "$rest"; done >> "$items"
   fi
   if [ -f "$APPDIR/docs/requirements.md" ]; then
+    leaves="$(leaf_ids)"
     awk '/^## 꼭 되어야 할 기능/ { f=1; next } /^## / { f=0 } f && /^[[:space:]]*- F[0-9]+/ { sub(/^[[:space:]]*- /, ""); print }' "$APPDIR/docs/requirements.md" |
     while read -r fid rest; do
+      printf '%s\n' "$leaves" | grep -qx "$fid" || continue   # 수용 기준이 있는 기능은 수용 기준 번호로 센다
       f="$( [ -f "$APPDIR/docs/tests.md" ] && grep -E "^[[:space:]]*- $fid[[:space:]]" "$APPDIR/docs/tests.md" | head -n1 | sed -n 's/.*(\([^)]*\)).*/\1/p')"
       if [ -n "$f" ] && [ -f "$APPDIR/$f" ] && bash "$HOOKS/check-approved.sh" listed "$APPDIR" "$APPDIR/$f" </dev/null >/dev/null 2>&1; then
         echo "ok	bf	기능 $fid $rest"; else echo "fail	bf	기능 $fid $rest (승인 테스트로 확인 안 됨)"; fi
@@ -825,7 +877,7 @@ cmd_lint() {
   [ -z "$(ids | sort | uniq -d)" ] || add "id 중복: $(ids | sort | uniq -d | paste -sd, -)"
   while IFS="$(printf '\t')" read -r id _ kind _ _ out _ chk nx rw jn fs mx sk old; do
     case "$kind" in AI|프로그램|외부AI|사람|AI+프로그램|끝) ;; *) add "$id: 모르는 종류 $kind" ;; esac
-    case "$chk" in -|lock|backend|tests|perf|redteam|secrets|score) ;; *) add "$id: 모르는 검사 $chk" ;; esac
+    case "$chk" in -|lock|backend|tests|perf|redteam|secrets|score|req|trace|undecided) ;; *) add "$id: 모르는 검사 $chk" ;; esac
     for x in $(opts "$nx") $(opts "$rw") $(opts "$jn"); do [ "$x" = "-" ] || is_node "$x" || add "$id: 없는 노드로 가는 엣지 $x"; done
     t="$(awk -F'\t' -v f="$id" '$1==f { print $2 }' "$FP" | sort -u | paste -sd, -)"
     f="$(opts "$fs" | tr ' ' '\n' | grep -v '^-$' | sort -u | paste -sd, -)"

@@ -62,12 +62,23 @@ boss() { # ★ 클릭 한 번 = approve
 
 mk() { local f; for f in "$@"; do mkdir -p "$(dirname "$A/$f")"; echo "# 가짜 $f" > "$A/$f"; done; }   # AI 노드가 내는 파일(가정)
 G init $A >/dev/null;                                   snap "init (새 앱)" "-"
-mk docs/requirements.md
+mkreq() { # 앱 폴더 — 기획서 검사(req)를 통과하는 기획서
+  printf '## 성공 기준
+- 장바구니 담기 3초 안
+## 빈칸 점검표
+- 사용자: 정함
+- 예산: 나중(첫 버전 뒤)
+## 꼭 되어야 할 기능
+- F1 장바구니 담기
+  - F1-1 담기를 누르면 앱은 장바구니 수를 1 올린다
+' > "$1/docs/requirements.md"; }
+mkreq $A; mk docs/review_req.md
 G pass $A req >/dev/null;                               snap "기획 → ★기획 검토 대기" "-"
 boss ok-req "OK";                                       snap "★기획 검토 OK → 설계안" "★ OK"
-mk docs/spec.md docs/design.md
+mk docs/spec.md docs/design.md docs/premortem.md
 G pass $A opt >/dev/null; boss ok-opt "1번 안(추천)";    snap "설계안 → ★설계 선택 → 테스트 목록" "★ 1번"
-mk docs/tests.md
+printf -- '- F1-1 → 장바구니 담기 (tests/test_a.spec.ts)
+' > $A/docs/tests.md
 G pass $A tl >/dev/null; boss ok-tl "OK";               snap "테스트 목록 → ★승인 → 테스트 코드" "★ OK"
 printf "test('F1 장바구니 담기', () => {})\n" > $A/tests/test_a.spec.ts
 G pass $A tc >/dev/null;                                snap "테스트 코드 → ⚙️ 자동 잠금 → 계획" "-"
@@ -142,7 +153,7 @@ row "그 상태에서 auto-lock 다시 → 거부" 1 "$(rc bash "$H/auto-lock.sh
 cp "$tmp/.ap" $A/tests/.approved
 
 # =============== B. 거부·한도·실패 엣지 ===============
-mkstate t1 ok-req 사장대기; echo '# 기획서' > apps/t1/docs/requirements.md
+mkstate t1 ok-req 사장대기; mkreq apps/t1; echo x > apps/t1/docs/review_req.md
 row "★ approve 없이 pass → 거부" 1 "$(rc G pass apps/t1 ok-req)"
 row "없는 실패 엣지(ok-req → ui) → 거부" 1 "$(rc G fail apps/t1 ok-req "x" ui)"
 out=""; for i in 1 2 3 4; do
@@ -241,6 +252,45 @@ sed 's#| docs/data.md, docs/api.md |#| docs/data.md, docs/DESIGN.md |#' "$src/.c
 row "lint: ui ∥ dd 가 같은 파일을 쓰게 바꾼 graph.md → 거부" 1 "$(GRAPH_MD="$tmp/bad.md" rc bash "$GS" lint)"
 rm -rf apps/e1 apps/p1 apps/b1 apps/b2 apps/b3 apps/m1
 
+# =============== G. 앞단계 문서 검사 (기획서·대조·안 정한 것) ===============
+mkstate q1 req 진행; mkreq apps/q1; echo x > apps/q1/docs/review_req.md
+sed -i 's/- 예산: 나중(첫 버전 뒤)/- 예산: 묻기/' apps/q1/docs/requirements.md
+row "req: 빈칸 점검표에 '묻기' 남음 → 거부" "1 req" "$(rc G pass apps/q1 req) $(cur_of q1)"
+mkreq apps/q1; sed -i '/F1-1/d' apps/q1/docs/requirements.md
+row "req: 기능에 수용 기준 없음 → 거부" "1 req" "$(rc G pass apps/q1 req) $(cur_of q1)"
+mkreq apps/q1; sed -i '/성공 기준/,/^## 빈칸/{/^- /d}' apps/q1/docs/requirements.md
+row "req: 성공 기준 없음 → 거부" "1 req" "$(rc G pass apps/q1 req) $(cur_of q1)"
+mkreq apps/q1; rm apps/q1/docs/review_req.md
+row "req: Gemini 비판(review_req.md) 없음 → 거부" "1 req" "$(rc G pass apps/q1 req) $(cur_of q1)"
+printf '## Gemini 지적\n- [높음] 성공 기준 — 모호함\n## Claude 판단\n' > apps/q1/docs/review_req.md
+row "req: Gemini 지적은 있는데 Claude 판단이 빔 → 거부" "1 req" "$(rc G pass apps/q1 req) $(cur_of q1)"
+printf '## Gemini 지적\n- [높음] 성공 기준 — 모호함\n## Claude 판단\n- [맞음] 성공 기준 — 해결: docs/requirements.md:2\n' > apps/q1/docs/review_req.md
+row "req: 정상 → 통과(★기획 검토로)" "0 ok-req" "$(rc G pass apps/q1 req) $(cur_of q1)"
+mkstate q2 tl 진행; mkreq apps/q2
+printf -- '- F1 → 담기 (tests/a.spec.ts)
+' > apps/q2/docs/tests.md
+row "tl: 수용 기준 F1-1에 테스트 없음 → 거부" "1 tl" "$(rc G pass apps/q2 tl) $(cur_of q2)"
+printf -- '- F1-1 → 담기 (tests/a.spec.ts)
+- F9-1 → 없는 기능 (tests/b.spec.ts)
+' > apps/q2/docs/tests.md
+row "tl: 기획서에 없는 번호 F9-1 → 거부" "1 tl" "$(rc G pass apps/q2 tl) $(cur_of q2)"
+printf -- '- F1-1 → 담기 (tests/a.spec.ts)
+' > apps/q2/docs/tests.md
+row "tl: 정상 → 통과(★테스트 승인으로)" "0 ok-tl" "$(rc G pass apps/q2 tl) $(cur_of q2)"
+mkstate q3 ip 진행; echo x > apps/q3/docs/plan.md
+printf '## 아직 안 정한 것
+- 결제 수단
+- 알림 시간 — 나중: 첫 버전엔 없음
+' > apps/q3/docs/spec.md
+row "ip: '아직 안 정한 것'에 이유 없는 항목 → 거부" "1 ip" "$(rc G pass apps/q3 ip) $(cur_of q3)"
+printf '## 아직 안 정한 것
+- 알림 시간 — 나중: 첫 버전엔 없음
+' > apps/q3/docs/spec.md
+row "ip: 모두 '나중:' → 통과(★계획 승인으로)" "0 ok-ip" "$(rc G pass apps/q3 ip) $(cur_of q3)"
+mkstate q4 opt 진행; echo x > apps/q4/docs/spec.md; echo x > apps/q4/docs/design.md
+row "opt: 사전 부검(premortem.md) 없음 → 거부" "1 opt" "$(rc G pass apps/q4 opt) $(cur_of q4)"
+rm -rf apps/q1 apps/q2 apps/q3 apps/q4
+
 # =============== F. 검증에서 나온 4가지 (테스트 개수·준비 코드 리뷰·내는 것·건너뛰기 연쇄·표에 없는 다음) ===============
 # F1. 테스트 개수: 실행 결과에서 통과 수 ≥ 승인된 테스트 수, 건너뜀 0, 0개 아님. 못 읽으면 통과 아님
 mkcnt() { # 앱, run.sh 내용 — 승인된 테스트 2개(a, b)를 잠그고 tr 진행
@@ -321,8 +371,8 @@ mkstate o1 req 진행
 row "req: requirements.md 없이 pass → 거부" "1 req" "$(rc G pass apps/o1 req) $(cur_of o1)"
 : > apps/o1/docs/requirements.md
 row "req: requirements.md가 빈 파일 → 거부" 1 "$(rc G pass apps/o1 req)"
-printf '# 기획서\n' > apps/o1/docs/requirements.md
-row "req: requirements.md 있음 → 통과(ok-req)" "0 ok-req" "$(rc G pass apps/o1 req) $(cur_of o1)"
+mkreq apps/o1; echo x > apps/o1/docs/review_req.md
+row "req: 기획서 검사에 맞는 requirements.md + review_req.md → 통과(ok-req)" "0 ok-req" "$(rc G pass apps/o1 req) $(cur_of o1)"
 mkstate o2 ui 진행; echo '# 디자인' > apps/o2/docs/DESIGN.md; mkdir -p apps/o2/docs/mockups
 row "ui: 시안 폴더(docs/mockups/)가 비어 있음 → 거부" 1 "$(rc G pass apps/o2 ui)"
 echo png > apps/o2/docs/mockups/home.png

@@ -64,15 +64,15 @@ flowchart TD
 <!-- nodes:start -->
 | id | 이름 | 종류 | 담당 | 받는 것 | 내는 것 | 통과 조건 | 검사 | 다음 | 다시 | 합류 | 실패 시 | 최대 | 건너뛰기 | 옛 단계 |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
-| req | 기획 | AI | 기획팀(agent-reach·ecc:market-research·superpowers:brainstorming) | 사장 답(★ 질문) | docs/requirements.md | 기획서 + "꼭 되어야 할 기능" 목록(F1, F2 …) | - | ok-req | - | - | - | 2 | - | 1 |
+| req | 기획 | AI | 기획팀(빈칸 점검표 인터뷰·agent-reach·ecc:market-research·superpowers:brainstorming) + Gemini 기획서 비판(doc-review.sh) | 사장 답(★ 질문) | docs/requirements.md, docs/review_req.md | 성공 기준 + 빈칸 점검표 "묻기" 0개 + 기능(F1 …)마다 수용 기준(F1-1 …) + Gemini 비판 1라운드 반영 | req | ok-req | - | - | - | 2 | - | 1 |
 | ok-req | ★기획 검토 | 사람 | 사장 | docs/requirements.md | 승인 기록 | approve | - | opt | - | - | req | - | - | 1 |
-| opt | 설계안 | AI | 팀 전체(superpowers:brainstorming·awesome-design) | docs/requirements.md | docs/spec.md, docs/design.md | 설계안 3개 + 점수표 + 디자인 방향 + 추천 | - | ok-opt | - | - | - | 3 | - | 2 |
+| opt | 설계안 | AI | 팀 전체(superpowers:brainstorming·awesome-design) | docs/requirements.md | docs/spec.md, docs/design.md, docs/premortem.md | 설계안 3개 + 점수표 + 디자인 방향 + 추천 + 추천안 사전 부검 | - | ok-opt | - | - | - | 3 | - | 2 |
 | ok-opt | ★설계 선택 | 사람 | 사장 | docs/design.md | 승인 기록 | approve | - | tl | - | - | opt | - | - | 2 |
-| tl | 테스트 목록 | AI | QA팀 | docs/spec.md | docs/tests.md | 쉬운 말 목록 + 기능(F번호) ↔ 테스트 대응 | - | ok-tl | - | - | - | 2 | - | 3 |
+| tl | 테스트 목록 | AI | QA팀 | docs/spec.md | docs/tests.md | 쉬운 말 목록 + 수용 기준(F1-1 …)마다 테스트 하나 이상, 기획서에 없는 번호 없음 | trace | ok-tl | - | - | - | 2 | - | 3 |
 | ok-tl | ★테스트 승인 | 사람 | 사장 | docs/tests.md | 승인 기록 | approve | - | tc | - | - | tl | - | - | 3 |
 | tc | 테스트 코드 | AI | QA팀(ecc:e2e-testing·ecc:react-testing) | docs/tests.md | tests/, HANDOFF 테스트 실행 줄 | 테스트 파일 + 실행 줄 | - | lock | - | - | - | 3 | - | 3 |
 | lock | 테스트 잠금 | 프로그램 | auto-lock.sh(처음), 사장(다시 잠글 때 ⑤) | tests/ | tests/.approved | 잠금 파일 있음 + 해시 일치 | lock | ip | bf | - | - | - | - | 3 |
-| ip | 계획 | AI | 계획 모드(superpowers:writing-plans, 이어 하는 앱은 modern-web-guidance 점검) | spec·design·tests.md | docs/plan.md | 단계별 확인 방법 + 탐색 점검 예상 비용 | - | ok-ip | - | - | - | 3 | - | 4 |
+| ip | 계획 | AI | 계획 모드(superpowers:writing-plans, 이어 하는 앱은 modern-web-guidance 점검) | spec·design·tests.md | docs/plan.md | 단계별 확인 방법 + 탐색 점검 예상 비용 + spec "아직 안 정한 것"이 모두 "나중:" | undecided | ok-ip | - | - | - | 3 | - | 4 |
 | ok-ip | ★계획 승인 | 사람 | 사장 | docs/plan.md | 승인 기록 + 탐색 점검 여부(budget) | approve + budget | - | ui+dd | - | - | ip | - | - | 4 |
 | ui | 디자인 | AI | 디자인팀 서브에이전트(hallmark·frontend-design) | docs/spec.md | docs/DESIGN.md, docs/mockups/ | DESIGN.md + 시안 캡처 | - | ok-ui | bf | - | - | 3 | 화면 없음 | 4 |
 | dd | 데이터·API | AI | 백엔드팀 서브에이전트 | docs/spec.md | docs/data.md, docs/api.md | 저장할 데이터(쉬운 말) + API 예시(아래 형식) | - | ok-dd | - | - | - | 3 | 서버 없음 | 4 |
@@ -200,7 +200,13 @@ flowchart TD
 
 **redteam.md 결과 줄**: `- [뚫림|의심] [심각|보통] <위치·공격> — 해결: <파일>:<줄>` (아직이면 `해결: 아직`). 심각 = 시크릿 노출·가격/결제 조작·남의 데이터.
 
-**꼭 되어야 할 기능**: requirements.md `## 꼭 되어야 할 기능` 아래 `- F1 <기능>` / tests.md 아래 `- F1 → <테스트 이름> (<tests/ 아래 파일>)`. 그 파일이 잠금 목록에 있고 tr이 통과면 ✓.
+**꼭 되어야 할 기능**: requirements.md `## 꼭 되어야 할 기능` 아래 `- F1 <기능>`, 그 밑에 수용 기준 `  - F1-1 <언제/조건>이면 앱은 <보이는 결과>를 한다` 한 줄 이상 / tests.md 아래 `- F1-1 → <테스트 이름> (<tests/ 아래 파일>)`. 점수(sc)는 **맨 끝 번호**(수용 기준이 있으면 F1-1·F1-2, 없으면 F1)마다 그 파일이 잠금 목록에 있고 tr이 통과면 ✓.
+
+**기획서 검사**(req, `req`): requirements.md에 ① `## 성공 기준` 아래 `- ` 줄 1개 이상 ② `## 빈칸 점검표` 아래 `- ` 줄 1개 이상이고 `묻기`가 든 줄 0개 ③ `## 꼭 되어야 할 기능`의 F번호마다 `F<번호>-<번호>` 수용 기준 1개 이상 ④ `docs/review_req.md`(`doc-review.sh`가 만듦)의 `## Gemini 지적`에 `- ` 지적이 있으면 `## Claude 판단`에도 `- ` 줄 1개 이상. 하나라도 아니면 통과하지 않는다. 견본: `templates/requirements.md`.
+
+**대조 검사**(tl, `trace`): requirements.md의 맨 끝 번호마다 tests.md에 `- <번호> →` 줄이 있어야 하고, tests.md의 `- F… →` 번호는 모두 requirements.md에 있어야 한다(빠진 기능·지어낸 기능 차단, Spec Kit analyze에 해당).
+
+**안 정한 것 검사**(ip, `undecided`): spec.md `## 아직 안 정한 것` 아래 `- ` 줄은 `- 없음`이거나 `나중:`(일부러 미룬 이유)이 들어 있어야 한다. 그 밖의 줄이 있으면 구현 전에 사장에게 물어 정한다.
 
 **근거 규칙**: AI 판단이 들어간 항목(체크리스트·리뷰 해결)은 `근거:`/`해결:`의 파일과 줄이 실제로 있어야 ✓. 없으면 ✗로 센다.
 
