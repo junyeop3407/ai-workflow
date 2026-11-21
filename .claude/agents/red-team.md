@@ -2,6 +2,7 @@
 name: red-team
 description: Attacks a locally running app under apps/ like a hacker to find security holes (build-app step 6, before the QA report, and whenever apps/<app>/.redteam-needed exists). Use after review is done and tests pass. Runs the app locally, tries attacks, and returns an attempts/results table without fixing anything.
 tools: Bash, Read, Grep, Glob
+model: haiku
 memory: project
 hooks:
   PreToolUse:
@@ -10,7 +11,6 @@ hooks:
         - type: command
           shell: bash
           command: 'bash "$CLAUDE_PROJECT_DIR/.claude/hooks/agent-memory-only.sh" red-team'
-model: sonnet
 color: red
 ---
 

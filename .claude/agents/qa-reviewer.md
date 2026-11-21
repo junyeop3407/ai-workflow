@@ -2,6 +2,7 @@
 name: qa-reviewer
 description: Independent QA code review for an app under apps/ (build-app step 5 ①). Use after implementation passes tests and before the Codex and Gemini cross-reviews. Reviews only the code, tests and docs/tests.md — never the implementing conversation — and returns a findings list.
 tools: Read, Grep, Glob, Bash
+model: haiku
 memory: project
 hooks:
   PreToolUse:
@@ -10,7 +11,6 @@ hooks:
         - type: command
           shell: bash
           command: 'bash "$CLAUDE_PROJECT_DIR/.claude/hooks/agent-memory-only.sh" qa-reviewer'
-model: sonnet
 color: blue
 ---
 
