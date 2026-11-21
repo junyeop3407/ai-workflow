@@ -339,19 +339,40 @@ sec_lines() { # 파일, 절 이름 → 그 절 아래 "- " 줄(앞 공백 포함
   awk -v h="## $2" 'index($0,h)==1 { f=1; next } /^## / { f=0 } f && /^[[:space:]]*- /' "$1"
 }
 feat_ids() { sec_lines "$APPDIR/docs/requirements.md" "꼭 되어야 할 기능" | sed -n 's/^[[:space:]]*- \(F[0-9][0-9-]*\).*/\1/p'; }
-leaf_ids() { # 수용 기준이 있는 기능은 수용 기준 번호만, 없는 기능은 기능 번호
-  local all; all="$(feat_ids)"
-  printf '%s\n' "$all" | awk 'NF { ids[NR]=$0; n=NR } END { for (i=1;i<=n;i++) { c=0; for (j=1;j<=n;j++) if (index(ids[j], ids[i] "-")==1) c=1; if (!c) print ids[i] } }'
+feat_line() { sec_lines "$APPDIR/docs/requirements.md" "꼭 되어야 할 기능" | grep -E "^[[:space:]]*- $1([[:space:]]|$)" | head -n1; }
+later_ids() { # [나중·…] 표시가 붙은 기능 번호 — 테스트·구현·점수에서 빠진다
+  sec_lines "$APPDIR/docs/requirements.md" "꼭 되어야 할 기능" | grep -E '^[[:space:]]*- F[0-9]+[[:space:]]+\[나중' | sed -n 's/^[[:space:]]*- \(F[0-9]*\).*/\1/p'; }
+leaf_ids() { # 1차 기능만: 수용 기준이 있으면 수용 기준 번호, 없으면 기능 번호
+  local all later; all="$(feat_ids)"; later="$(later_ids | paste -sd' ' -)"
+  printf '%s\n' "$all" | awk -v later="$later" 'BEGIN { m=split(later, L, " ") }
+    NF { ids[NR]=$0; n=NR }
+    END { for (i=1;i<=n;i++) { skip=0
+            for (k=1;k<=m;k++) if (ids[i]==L[k] || index(ids[i], L[k] "-")==1) skip=1
+            if (skip) continue
+            c=0; for (j=1;j<=n;j++) if (index(ids[j], ids[i] "-")==1) c=1
+            if (!c) print ids[i] } }'
 }
 req_ok() {
-  local r="$APPDIR/docs/requirements.md" bad="" f
+  local r="$APPDIR/docs/requirements.md" bad="" f line first=0 c
+  [ -n "$(sec_lines "$r" "출시 안내문")" ] || bad="$bad '## 출시 안내문' 줄 없음;"
+  [ -n "$(sec_lines "$r" "예상 질문")" ] || bad="$bad '## 예상 질문' 줄 없음;"
   [ -n "$(sec_lines "$r" "성공 기준")" ] || bad="$bad '## 성공 기준' 줄 없음;"
   [ -n "$(sec_lines "$r" "빈칸 점검표")" ] || bad="$bad '## 빈칸 점검표' 줄 없음;"
   sec_lines "$r" "빈칸 점검표" | grep -q '묻기' && bad="$bad 빈칸 점검표에 '묻기' 남음($(sec_lines "$r" "빈칸 점검표" | grep '묻기' | sed 's/^[[:space:]]*- //' | cut -c1-30 | paste -sd, -));"
   [ -n "$(feat_ids)" ] || bad="$bad '## 꼭 되어야 할 기능'에 F번호 없음;"
   for f in $(feat_ids | grep -v -- '-'); do
-    feat_ids | grep -q "^$f-" || bad="$bad $f 수용 기준(${f}-1 …) 없음;"
+    line="$(feat_line "$f")"
+    if ! printf '%s' "$line" | grep -Eq "^[[:space:]]*- $f[[:space:]]+\[(1차|나중)·(꼭|많을수록|놀람)\]"; then
+      bad="$bad $f 표시 없음([1차|나중·꼭|많을수록|놀람]);"; continue
+    fi
+    printf '%s' "$line" | grep -q '\[나중' && continue
+    first=1
+    feat_ids | grep -q "^$f-" || { bad="$bad $f 수용 기준(${f}-1 …) 없음;"; continue; }
+    for c in $(feat_ids | grep "^$f-"); do
+      feat_line "$c" | grep -q '예:' || bad="$bad $c 예시('— 예: …') 없음;"
+    done
   done
+  [ -n "$(feat_ids)" ] && [ "$first" = 0 ] && bad="$bad 1차 기능이 하나도 없음;"
   if [ -f "$APPDIR/docs/review_req.md" ] && ! sec_lines "$APPDIR/docs/review_req.md" "Gemini 지적" | grep -q . ; then :
   elif [ -f "$APPDIR/docs/review_req.md" ] && [ -z "$(sec_lines "$APPDIR/docs/review_req.md" "Claude 판단")" ]; then
     bad="$bad review_req.md '## Claude 판단'이 비어 있음(지적마다 [맞음|틀림|사장 확인] 한 줄);"
@@ -368,7 +389,7 @@ trace_ok() {
   [ -n "$bad" ] && bad=" 테스트가 없는 번호:$bad"
   if [ -f "$t" ]; then
     for id in $(sed -n 's/^[[:space:]]*- \(F[0-9][0-9-]*\)[[:space:]]*→.*/\1/p' "$t"); do
-      printf '%s\n' "$leaves" | grep -qx "$id" || bad="$bad 기획서에 없는 번호: $id;"
+      printf '%s\n' "$leaves" | grep -qx "$id" || bad="$bad 1차 기능에 없는 번호(나중 기능이거나 지어낸 번호): $id;"
     done
   fi
   [ -z "$bad" ] && return 0; TRACE_MSG="기획서 ↔ 테스트 목록 대조 실패:$bad"; return 1

@@ -63,14 +63,19 @@ boss() { # ★ 클릭 한 번 = approve
 mk() { local f; for f in "$@"; do mkdir -p "$(dirname "$A/$f")"; echo "# 가짜 $f" > "$A/$f"; done; }   # AI 노드가 내는 파일(가정)
 G init $A >/dev/null;                                   snap "init (새 앱)" "-"
 mkreq() { # 앱 폴더 — 기획서 검사(req)를 통과하는 기획서
-  printf '## 성공 기준
+  printf '## 출시 안내문
+- 이제 버튼 하나로 장바구니에 담을 수 있습니다.
+## 예상 질문
+- 저장되나요? → 네
+## 성공 기준
 - 장바구니 담기 3초 안
 ## 빈칸 점검표
 - 사용자: 정함
 - 예산: 나중(첫 버전 뒤)
 ## 꼭 되어야 할 기능
-- F1 장바구니 담기
-  - F1-1 담기를 누르면 앱은 장바구니 수를 1 올린다
+- F1 [1차·꼭] 장바구니 담기
+  - F1-1 담기를 누르면 앱은 장바구니 수를 1 올린다 — 예: 사과 1개 → 장바구니 1
+- F2 [나중·놀람] 추천 상품
 ' > "$1/docs/requirements.md"; }
 mkreq $A; mk docs/review_req.md
 G pass $A req >/dev/null;                               snap "기획 → ★기획 검토 대기" "-"
@@ -266,7 +271,21 @@ printf '## Gemini 지적\n- [높음] 성공 기준 — 모호함\n## Claude 판�
 row "req: Gemini 지적은 있는데 Claude 판단이 빔 → 거부" "1 req" "$(rc G pass apps/q1 req) $(cur_of q1)"
 printf '## Gemini 지적\n- [높음] 성공 기준 — 모호함\n## Claude 판단\n- [맞음] 성공 기준 — 해결: docs/requirements.md:2\n' > apps/q1/docs/review_req.md
 row "req: 정상 → 통과(★기획 검토로)" "0 ok-req" "$(rc G pass apps/q1 req) $(cur_of q1)"
+mkstate q5 req 진행; echo x > apps/q5/docs/review_req.md
+mkreq apps/q5; sed -i 's/- F1 \[1차·꼭\] /- F1 /' apps/q5/docs/requirements.md
+row "req: 기능에 [1차|나중·꼭|많을수록|놀람] 표시 없음 → 거부" "1 req" "$(rc G pass apps/q5 req) $(cur_of q5)"
+mkreq apps/q5; sed -i 's/ — 예: 사과 1개 → 장바구니 1//' apps/q5/docs/requirements.md
+row "req: 수용 기준에 예시(— 예:) 없음 → 거부" "1 req" "$(rc G pass apps/q5 req) $(cur_of q5)"
+mkreq apps/q5; sed -i '/^## 출시 안내문/,/^## 예상/{/^- /d}' apps/q5/docs/requirements.md
+row "req: 출시 안내문 없음 → 거부" "1 req" "$(rc G pass apps/q5 req) $(cur_of q5)"
+mkreq apps/q5; sed -i 's/\[1차·꼭\]/[나중·꼭]/' apps/q5/docs/requirements.md
+row "req: 1차 기능이 하나도 없음 → 거부" "1 req" "$(rc G pass apps/q5 req) $(cur_of q5)"
+mkreq apps/q5
+row "req: 나중 기능(F2)은 수용 기준 없어도 → 통과" "0 ok-req" "$(rc G pass apps/q5 req) $(cur_of q5)"
+rm -rf apps/q5
 mkstate q2 tl 진행; mkreq apps/q2
+printf -- '- F1-1 → 담기 (tests/a.spec.ts)\n- F2 → 추천 (tests/b.spec.ts)\n' > apps/q2/docs/tests.md
+row "tl: 나중 기능 F2에 테스트를 만듦 → 거부" "1 tl" "$(rc G pass apps/q2 tl) $(cur_of q2)"
 printf -- '- F1 → 담기 (tests/a.spec.ts)
 ' > apps/q2/docs/tests.md
 row "tl: 수용 기준 F1-1에 테스트 없음 → 거부" "1 tl" "$(rc G pass apps/q2 tl) $(cur_of q2)"
