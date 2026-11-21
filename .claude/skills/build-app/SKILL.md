@@ -83,7 +83,7 @@ ECC 플러그인(`ecc:` 이름)은 아래 표에 적힌 것만 쓴다. ECC의 �
 | 4단계 디자인팀 시안·DESIGN.md | hallmark, frontend-design | AI 티 안 나는 화면 방향과 구성 |
 | 4단계 화면 다듬기 | emil-design-eng | 버튼·애니메이션 같은 작은 디테일 |
 | 모든 코드 작성·수정 (4단계) | ponytail | 필요한 만큼만 짓되 검증·보안·예외 처리는 빼지 않음 |
-| 백엔드 코드 작성·수정 (4단계, 서버가 있는 앱) | ecc:springboot-patterns, ecc:springboot-security, ecc:java-coding-standards | Spring 구조·API 설계, 로그인·권한·입력 검증, Java 코드 규칙. 버전별 API는 context7이 우선 |
+| 백엔드 코드 작성·수정 (4단계, 서버가 있는 앱) | ecc:springboot-patterns, ecc:springboot-security, ecc:java-coding-standards | Spring 구조·API 설계, 로그인·권한·입력 검증, Java 코드 규칙. 설계는 `.claude/rules/backend-solid.md`(SOLID 위반 신호 0개, 과한 추상화도 금지)가 우선. 버전별 API는 context7이 우선 |
 | 테스트 코드 작성 (3·4단계) | ecc:e2e-testing, ecc:react-testing | Playwright 화면 테스트, Vitest 부품 테스트 짜는 방법 |
 | 빌드가 안 될 때 (4단계) | `ecc:java-build-resolver`, `ecc:react-build-resolver` 에이전트 | 빌드 에러만 최소로 고침. 고친 뒤 `test-runner`로 다시 확인 |
 | 화면 코드 작성·수정 전 (4단계, 매번) | modern-web-guidance | 그 작업의 최신 웹 표준 가이드를 먼저 찾아 브라우저 기본 기능으로 짬. iOS Safari 호환(Baseline Widely available) 기준. 자세한 건 `.claude/rules/web-and-mobile.md` |
@@ -111,7 +111,7 @@ ECC 플러그인(`ecc:` 이름)은 아래 표에 적힌 것만 쓴다. ECC의 �
 "구현 → 테스트 → 실패한 것만 고치기"를 Claude가 혼자 반복하게 하는 장치. 다섯 칸: **목표**(노드 통과 조건) · **채점표**(bb = `백엔드 테스트:` 줄, bf = 승인된 테스트 전체 + 해시) · **일지**(`progress.md`) · **브레이크**(15회·같은 실패 3연속) · **잠금**(`.approved` + 훅).
 1. 시작 전에 `cross-review.sh snapshot apps/<앱>`으로 기준점을 찍어 `progress.md` 맨 위 "단계 1 기준: <해시>"로 적는다(Codex 빠른 검수용). 4단계 시작 직전 커밋은 HANDOFF `리뷰 기준:`에.
 2. **자동 루프**: 응답을 끝내려 할 때마다 Stop 훅(`graph-stop.sh` → `graph.sh loop`)이 그 노드의 통과 검사를 직접 돌린다. 실패면 막고 "실패한 테스트·한 줄 원인 → 계속 고쳐라"를 돌려주고 회차를 state.json에 센다. 통과면 자동으로 `pass` → 다음 노드(cb·cf)를 시작하라고 알린다. 사장 명령은 필요 없다. (사장이 원하면 /goal을 따로 써도 된다.)
-   - **bb(백엔드)**: 앱 HANDOFF에 `백엔드 테스트: \`bash tests/backend.sh\``. 견본 `templates/backend.sh`를 복사(JUnit → 서버 켜기 → `docs/api.md` 예시 확인(`api-check.sh`) → 서버 끄기, 포트 사용 중·시간 초과·Ctrl+C 안전장치). 승인된 Playwright 테스트는 bb 통과 조건이 아니다. 백엔드 부품 테스트(JUnit)는 QA팀이 bb 시작 때 추가한다.
+   - **bb(백엔드)**: 앱 HANDOFF에 `백엔드 테스트: \`bash tests/backend.sh\``. 견본 `templates/backend.sh`를 복사(JUnit → 서버 켜기 → `docs/api.md` 예시 확인(`api-check.sh`) → 서버 끄기, 포트 사용 중·시간 초과·Ctrl+C 안전장치). 승인된 Playwright 테스트는 bb 통과 조건이 아니다. 백엔드 부품 테스트(JUnit)는 QA팀이 bb 시작 때 추가한다. 이때 **구조 검사 테스트(ArchUnit `ArchitectureTest`)**도 함께 넣어 SOLID 위반이 있으면 `./gradlew test`가 실패하게 한다(`.claude/rules/backend-solid.md` "언제 확인하나").
    - **bf(프론트)**: `테스트 실행:` 줄(승인된 테스트 전체) + 잠금 해시. api.md를 보고 붙인다.
    - 서버 없는 앱은 `graph.sh skip apps/<앱> dd,ok-dd,bb,cb "서버 없음"`(ok-ip 전에) → 합류 뒤 바로 bf.
 3. **일지** `apps/<앱>/docs/progress.md` — 매 회차 한 줄 추가(커밋 전에도 파일로 남아 새 세션이 이어 받는다):

@@ -139,6 +139,7 @@ related=$(printf '%s\n' "$related" | sed '/^$/d' | grep -Ev "$secret_re" | sort 
 
 prompt="너는 시니어 코드 리뷰어다. 아래 변경사항을 리뷰해라.
 - 버그, 보안 문제, 예외 처리 누락, 성능 문제만 지적할 것. 스타일·네이밍 같은 취향 문제는 제외.
+- Java·Kotlin(Spring) 파일이 있으면 SOLID 위반도 지적할 것(취향이 아님): 컨트롤러에 업무 규칙·리포지토리 직접 호출, 의존성 5개 넘는 서비스, 같은 종류 분기 switch/if가 두 곳 이상, 구현의 UnsupportedOperationException·instanceof 분기, 메서드 7개 넘는 직접 만든 인터페이스, 필드 주입·서비스 안의 new로 의존 객체 생성·외부 SDK 직접 import. 반대로 구현 하나뿐인 Service+ServiceImpl 같은 과한 추상화도 지적. 항목 앞에 '원칙: S/O/L/I/D/과함'을 붙일 것.
 - 각 항목마다 [심각도: 높음/중간/낮음], 파일명과 줄 번호, 문제 이유, 수정 제안을 적을 것.
 - 확실하지 않은 지적은 '추정'이라고 표시할 것.
 - 문제가 없으면 '문제 없음'이라고만 답할 것.

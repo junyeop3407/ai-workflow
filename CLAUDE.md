@@ -38,6 +38,7 @@
 | 무엇 | 어디 | 언제 불러지나 |
 |---|---|---|
 | 보안(서버 분리·암호화·인프라·레드팀) | `.claude/rules/security.md` | `apps/` 파일을 열 때 |
+| 백엔드 설계(SOLID 위반 신호 0개, 과한 추상화 금지, ArchUnit 구조 검사) | `.claude/rules/backend-solid.md` | `.java`·`.kt`·빌드 설정·api.md를 열 때 |
 | 웹+안드로이드·iOS 화면, DESIGN.md 따르기 | `.claude/rules/web-and-mobile.md` | 화면 코드·Capacitor 파일을 열 때 |
 | 테스트(승인된 테스트 보호, 회귀 테스트) | `.claude/rules/testing.md` | `tests/`·테스트 파일을 열 때 |
 | 앱 한 바퀴 절차, 단계별 스킬 사용 표 | `/build-app` 스킬 | 앱 작업을 시작할 때 |
