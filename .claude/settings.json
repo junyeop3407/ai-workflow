@@ -82,6 +82,12 @@
             "shell": "bash",
             "command": "bash \"$CLAUDE_PROJECT_DIR/.claude/hooks/agent-memory-only.sh\"",
             "timeout": 10
+          },
+          {
+            "type": "command",
+            "shell": "bash",
+            "command": "bash \"$CLAUDE_PROJECT_DIR/.claude/hooks/team-files.sh\"",
+            "timeout": 10
           }
         ]
       }

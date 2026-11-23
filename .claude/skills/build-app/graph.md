@@ -19,11 +19,11 @@ flowchart TD
   okip --> dd["데이터 + API 목록 🤖 백엔드팀"] --> okdd{{"★ 데이터·API 검토"}}
   okui --> J(("합류"))
   okdd --> J
-  J --> bb["백엔드 구현 🤖 + ⚙️ 자동 루프 (백엔드 테스트)"]
+  J --> bb["백엔드 구현 🤖 backend-dev + ⚙️ 자동 루프 (백엔드 테스트)"]
   J -. "서버 없음: dd·bb 건너뜀" .-> bf
   bb --> cb["Codex 빠른 검수 🌐"]
   cb -- "다음 plan 단계 / 지적" --> bb
-  cb -- "마지막 단계" --> bf["프론트 구현 🤖 + ⚙️ 자동 루프 (승인 테스트 + 해시)"]
+  cb -- "마지막 단계" --> bf["프론트 구현 🤖 frontend-dev + ⚙️ 자동 루프 (승인 테스트 + 해시)"]
   bf --> cf["Codex 빠른 검수 🌐"]
   cf -- "다음 plan 단계 / 지적" --> bf
   cf -- "마지막 단계" --> ug["화면 점검 🤖 web-design-guidelines · break-ui"]
@@ -78,9 +78,9 @@ flowchart TD
 | dd | 데이터·API | AI | 백엔드팀 서브에이전트 | docs/spec.md | docs/data.md, docs/api.md | 저장할 데이터(쉬운 말) + API 예시(아래 형식) | - | ok-dd | - | - | - | 3 | 서버 없음 | 4 |
 | ok-ui | ★디자인 검토 | 사람 | 사장 | DESIGN.md, 시안 캡처 | 승인 기록 | approve | - | bb | - | - | ui | - | 화면 없음 | 4 |
 | ok-dd | ★데이터·API 검토 | 사람 | 사장 | data.md, api.md | 승인 기록 | approve | - | bb | - | - | dd | - | 서버 없음 | 4 |
-| bb | 백엔드 구현 | AI+프로그램 | 백엔드팀 + 자동 루프(ecc:springboot-*) | plan.md, api.md | 서버 코드, JUnit, tests/backend.sh, docs/progress.md | 백엔드 테스트 줄 통과 | backend | cb | tr | ok-ui,ok-dd | - | 5 | 서버 없음 | 4 |
+| bb | 백엔드 구현 | AI+프로그램 | 개발팀 backend-dev 에이전트(업무 요청서는 메인 통합) + 자동 루프(ecc:springboot-*) | plan.md, api.md | 서버 코드, JUnit, tests/backend.sh, docs/progress.md | 백엔드 테스트 줄 통과 | backend | cb | tr | ok-ui,ok-dd | - | 5 | 서버 없음 | 4 |
 | cb | Codex 빠른 검수(백엔드) | 외부AI | Codex(cross-review.sh) | 그 plan 단계 변경분 | docs/review_codex.md | 맞는 지적 없음(1라운드) | - | bb,bf | - | - | bb | - | 서버 없음 | 4 |
-| bf | 프론트 구현 | AI+프로그램 | 프론트팀 + 자동 루프(modern-web-guidance·context7·ponytail) | plan.md, api.md, DESIGN.md | 화면 코드, docs/progress.md | 테스트 실행 줄 통과 + 개수(통과 ≥ 승인·건너뜀 0) + 해시 일치 | tests | cf | tr | ok-ui,ok-dd | - | 5 | - | 4 |
+| bf | 프론트 구현 | AI+프로그램 | 개발팀 frontend-dev 에이전트(업무 요청서는 메인 통합) + 자동 루프(modern-web-guidance·context7·ponytail) | plan.md, api.md, DESIGN.md | 화면 코드, docs/progress.md | 테스트 실행 줄 통과 + 개수(통과 ≥ 승인·건너뜀 0) + 해시 일치 | tests | cf | tr | ok-ui,ok-dd | - | 5 | - | 4 |
 | cf | Codex 빠른 검수(프론트) | 외부AI | Codex(cross-review.sh) | 그 plan 단계 변경분 | docs/review_codex.md | 맞는 지적 없음(1라운드) | - | bf,ug | - | - | bf | - | - | 4 |
 | ug | 화면 점검 | AI | web-design-guidelines, break-ui | 실행 중인 앱(localhost) | docs/ui-check.md | 맞는 지적 해결(근거 줄) | - | tr | - | - | bf,ui | 3 | 화면 없음 | 5 |
 | tr | 테스트 | 프로그램 | graph.sh | 테스트 실행 줄 | docs/test-log.txt | 전체 통과 + 개수(통과 ≥ 승인·건너뜀 0) + 해시 일치 | tests | qa | - | - | bf,bb | - | - | 5 |

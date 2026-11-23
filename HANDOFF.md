@@ -1,6 +1,6 @@
 # HANDOFF — 다음 세션 시작 가이드
 
-마지막 갱신: 2026-11-22 (앞단계 보완 ①~⑧ 반영)
+마지막 갱신: 2026-11-23 (조직 개편 ① 개발팀 = 진짜 팀 에이전트)
 
 ## 1. 한 줄 요약
 이석균 선배님 특강(AI 기초)의 방식대로 앱을 만드는 **작업장 견본**이다. 사용자는 **사장**, Claude의 팀들(기획·디자인·프론트엔드·백엔드·QA)은 **직원**이고, 모든 팀의 결과물은 사장 검토를 받는다. 규칙, `/build-app` 스킬, 교차 리뷰, 훅, **그래프(앱 작업이 graph.md 흐름을 따라 자동으로 흐름, 사장은 ★에서 보기만 누름)** 가 준비되어 있고 아직 만든 앱은 없다. **다음 할 일: 첫 앱 만들기 (`/build-app 만들고 싶은 것`).**
@@ -31,6 +31,8 @@
 | 그래프 검증 고침 | ① 테스트 개수 확인: bf·tr·sc가 exit 0만 믿지 않고 출력에서 개수를 읽어 통과 ≥ 승인된 테스트 수·건너뜀 0일 때만 통과, 못 읽으면 거부(`run.sh`를 `exit 0`으로 위조하는 길 차단, `graph.sh tcount`, Playwright·Vitest·Jest·pytest·Maven·Gradle·node --test). 바뀐 준비 코드(run.sh·conftest·fixtures·config)는 qa가 review.md `## 준비 코드 변경`에 파일마다 적어야 통과 ② AI 노드 "내는 것" 파일이 있고 비어 있지 않아야 pass ③ "서버 없음"·"화면 없음" 건너뛰기 연쇄 ④ pass에 표에 없는 다음 노드 → 거부. 자동 보안 리뷰 지적 3개도 고침(준비 코드 경로는 글자 그대로 비교, 점 파일·러너 설정 포함, 기준은 qa 통과 때만 남겨 첫 qa가 전부 봄). 시험 `test-graph.sh` 104개·`test-hooks.sh --settings` 129개. 남은 위험: run.sh가 합계 줄을 echo로 꾸미면 graph.sh는 못 가림(qa 준비 코드 리뷰가 잡음) | ✅ 2026-11-20 |
 | 백엔드 SOLID | `.claude/rules/backend-solid.md`(원칙별 뜻·Spring 적용·위반 신호, 과한 추상화도 위반, 기준 "바깥 연결이거나 종류 2개 이상이면 인터페이스"). 확인: bb 때 QA팀이 ArchUnit `ArchitectureTest`를 JUnit에 넣어 위반 시 `./gradlew test` 실패 · cross-review.sh 요청문에 SOLID 점검 · qa-reviewer가 `[중간]`(`원칙: S/O/L/I/D/과함`) 지적. 시험 test-graph·test-hooks 통과. 사장 OK. 견본 `templates/ArchitectureTest.java`(ArchUnit 1.5.1, 규칙 6개) — context7 대신 공식 웹 문서·GitHub 소스로 확인(사장 허락). 깨끗한 견본 코드 6/6 통과, 심어 둔 위반 4개 모두 잡음 | ✅ 2026-11-22 |
 | 앞단계 보완 | 분석 `docs/front-stage-review.md`(사장 레퍼런스 3개 + Anthropic·grill-me·Spec Kit·EARS·Shape Up·사전 부검). 반영 ①~⑧: 성공 기준·빈칸 점검표 인터뷰(`SKILL.md` "기획 인터뷰", 견본 `templates/requirements.md`), Gemini 기획서 비판(`doc-review.sh`, agy), 사전 부검(`docs/premortem.md`), 수용 기준 `F1-1`, graph.sh 검사 `req`·`trace`·`undecided`, 되돌리기 어려운 동작 확인 절차, ★ 검토 요청 틀. 추가 ⑨~⑬도 반영: 수용 기준마다 `— 예:` 예시, 출시 안내문 3문장 + 예상 질문, 기능 `[1차|나중·꼭|많을수록|놀람]`(1차만으로 처음부터 끝까지 한 번 돌기, 나중은 테스트·점수에서 빠짐), ★기획 검토 때 회색 상자 화면 초안(`docs/wireframe/`, 절차만) | ✅ 2026-11-22 |
+| 조직 개편 ① 개발팀 | 사장의 "AI 가상오피스 조직 명세"(비서 제외)를 적용. 정한 것: Codex = 개발팀 **리뷰·통합 확인**(구현 안 함, 교차 리뷰 독립 유지), 백엔드·프론트는 **진짜 팀 에이전트** `backend-dev`·`frontend-dev`(sonnet, bb·bf에서 실제로 코드를 짬, 메인은 통합·업무 요청서·커밋). 파일 경계 훅 `team-files.sh`(Edit·Write 즉시 차단 + Bash로 쓴 것은 `check`로 확인, 테스트·`src/test`·러너 설정·`docs/`·state.json은 둘 다 못 고침). 조직도·책임표·업무 요청서 `docs/org.md`. 자동 루프(Stop 훅)는 메인에 그대로. 시험 test-hooks --settings 148개 통과 | ✅ 2026-11-23 |
+| 조직 개편 ② 법무·경영 | 법무팀(외부 데이터·라이선스·개인정보 GREEN/YELLOW/RED)·경영팀(요구사항 변경 영향·순서 조정)을 넣을지·어디에 넣을지 사장 결정 대기. 실제 앱으로 backend-dev·frontend-dev 흐름은 아직 안 돌려 봄 | ⬜ 다음 |
 | 다음 | 첫 앱 만들기 (`apps/<앱이름>/`) | ⬜ 다음 |
 | 교차 리뷰 | Codex + Gemini CLI 리뷰 (**둘 다 필수**, 변경분 1라운드, README 참고) | ✅ 준비됨 |
 | 구조 정리 | CLAUDE.md를 rules·skills·hooks·agents로 나눔 (130 → 93줄) | ✅ 2026-11-01 |
@@ -53,7 +55,11 @@
 ├── .claude/agents/                        서브에이전트 (요약만 돌려줌)
 │   ├── test-runner.md                     테스트 실행 → N/N + 실패 요약
 │   ├── qa-reviewer.md                     5단계 분리 리뷰 (memory: project)
-│   └── red-team.md                        6단계 실행 중인 앱 공격 (memory: project)
+│   ├── red-team.md                        6단계 실행 중인 앱 공격 (memory: project)
+│   ├── backend-dev.md                     개발팀 백엔드: bb에서 서버 코드 작성 (서버 파일만)
+│   └── frontend-dev.md                    개발팀 프론트엔드: bf에서 화면 코드 작성 (화면 파일만)
+├── docs/org.md                            조직도·책임표·개발팀 파일 경계·업무 요청서
+├── .claude/hooks/team-files.sh            개발팀 에이전트 파일 경계 (훅 + check·owner)
 ├── .claude/agent-memory/                  qa-reviewer·red-team 메모리 (커밋됨, 일반 패턴만)
 ├── .claude/skills/weekly-review/SKILL.md  /weekly-review 주간 회고 (반복된 실수 → 규칙 후보 최대 3개)
 ├── docs/last-weekly-review.txt            마지막 주간 회고 날짜 (세션 시작 훅이 읽음)

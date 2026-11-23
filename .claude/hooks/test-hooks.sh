@@ -197,6 +197,24 @@ row "frontmatter 방식(인자 qa-reviewer, agent_type 없음) 앱 코드" 막�
 row "메인 대화(agent_type 없음)가 앱 코드 Write" 통과 "$(run "$(write_json "$tmp/apps/demo/src/app.js" "x")" agent-memory-only.sh)"
 row "다른 에이전트(test-runner)가 Write" 통과 "$(run "$(agent_write_json test-runner "$tmp/apps/demo/src/app.js")" agent-memory-only.sh)"
 
+# ---- 5-1. 개발팀 파일 경계 (team-files.sh) ----
+row "backend-dev가 서버 코드(src/main/java) Write" 통과 "$(run "$(agent_write_json backend-dev "$tmp/apps/demo/src/main/java/A.java")" team-files.sh)"
+row "backend-dev가 build.gradle Write" 통과 "$(run "$(agent_write_json backend-dev "$tmp/apps/demo/build.gradle")" team-files.sh)"
+row "backend-dev가 화면 코드 Write" 막힘 "$(run "$(agent_write_json backend-dev "$tmp/apps/demo/src/App.tsx")" team-files.sh)"
+row "backend-dev가 구조 검사 테스트(src/test) Write" 막힘 "$(run "$(agent_write_json backend-dev "$tmp/apps/demo/src/test/java/ArchitectureTest.java")" team-files.sh)"
+row "frontend-dev가 화면 코드 Write" 통과 "$(run "$(agent_write_json frontend-dev "$tmp/apps/demo/src/App.tsx")" team-files.sh)"
+row "frontend-dev가 Windows 경로로 화면 코드 Write" 통과 "$(run "$(agent_write_json frontend-dev 'C:\work\apps\demo\src\App.tsx')" team-files.sh)"
+row "frontend-dev가 서버 코드 Write" 막힘 "$(run "$(agent_write_json frontend-dev "$tmp/apps/demo/src/main/java/A.java")" team-files.sh)"
+row "frontend-dev가 tests/ Write" 막힘 "$(run "$(agent_write_json frontend-dev "$tmp/apps/demo/tests/a.spec.ts")" team-files.sh)"
+row "frontend-dev가 docs/api.md Write" 막힘 "$(run "$(agent_write_json frontend-dev "$tmp/apps/demo/docs/api.md")" team-files.sh)"
+row "frontend-dev가 playwright.config Write" 막힘 "$(run "$(agent_write_json frontend-dev "$tmp/apps/demo/playwright.config.ts")" team-files.sh)"
+row "frontend-dev가 state.json Write" 막힘 "$(run "$(agent_write_json frontend-dev "$tmp/apps/demo/state.json")" team-files.sh)"
+row "frontend-dev가 앱 밖(.claude/hooks) Write" 막힘 "$(run "$(agent_write_json frontend-dev "$tmp/.claude/hooks/x.sh")" team-files.sh)"
+row "frontend-dev가 ../ 로 빠져나가기" 막힘 "$(run "$(agent_write_json frontend-dev "$tmp/apps/demo/src/../../x/tests/a.ts")" team-files.sh)"
+row "frontmatter 방식(인자 backend-dev, agent_type 없음) 화면 코드" 막힘 "$(run "$(write_json "$tmp/apps/demo/src/App.tsx" "x")" team-files.sh backend-dev)"
+row "메인 대화(agent_type 없음)가 서버 코드 Write" 통과 "$(run "$(write_json "$tmp/apps/demo/src/main/java/A.java" "x")" team-files.sh)"
+row "다른 에이전트(qa-reviewer)는 이 훅이 관여 안 함" 통과 "$(run "$(agent_write_json qa-reviewer "$tmp/apps/demo/src/App.tsx")" team-files.sh)"
+
 # ---- 6. 세션 시작 (session-start.sh) ----
 ss() { printf '{"session_id":"t","hook_event_name":"SessionStart","source":"%s"}' "$1"; }
 old="$(date -d '-10 days' +%Y-%m-%d 2>/dev/null || date -v-10d +%Y-%m-%d)"
@@ -295,6 +313,12 @@ if [ "$1" = "--settings" ]; then
     f="$src/.claude/agents/$a.md"
     r="없음"; grep -q '^memory: project' "$f" && grep -q 'agent-memory-only.sh" '"$a" "$f" && r="등록됨"
     row "등록: $a 에이전트 memory + 메모리 훅" 등록됨 "$r"
+  done
+  row "등록: PreToolUse Edit|Write|MultiEdit|NotebookEdit → team-files" 등록됨 "$(has PreToolUse 'Edit|Write|MultiEdit|NotebookEdit' team-files.sh)"
+  for a in backend-dev frontend-dev; do
+    f="$src/.claude/agents/$a.md"
+    r="없음"; grep -q 'team-files.sh" '"$a" "$f" && grep -q '^model: sonnet' "$f" && r="등록됨"
+    row "등록: $a 에이전트 sonnet + 파일 경계 훅" 등록됨 "$r"
   done
 fi
 
