@@ -65,9 +65,14 @@ if [ "$mode" = "commit" ]; then
   # 구현 중에 다른 컴퓨터(집 Windows ↔ 밖 Mac)로 옮기려고. main 등 다른 브랜치는 그대로 막는다.
   # wip를 main에 합칠 때는 guard-git.sh가 --squash를 요구해서, 합친 뒤의 git commit 에서 이 검사가 다시 돈다.
   # 승인된 테스트 잠금 검사(check-approved.sh commit)는 wip에서도 그대로.
-  case "$(git symbolic-ref --quiet --short HEAD 2>/dev/null)" in
-    wip/*) exit 0 ;;
-  esac
+  # 예외는 "git commit 하나만 있는 명령"일 때만: 훅은 실행 전 브랜치를 보므로, 이어 붙인 명령(;·&&·||·|·줄바꿈)이나
+  # 브랜치를 바꾸는 명령(switch·checkout·reset·update-ref·symbolic-ref·branch·worktree·-C)이 섞이면 예외를 주지 않는다.
+  wcmd="$(printf '%s' "$input" | tr '\n' ' ' | sed -n 's/.*"command"[[:space:]]*:[[:space:]]*"//p' | sed 's/"[[:space:]]*,[[:space:]]*"[a-z_]*"[[:space:]]*:.*//; s/"[[:space:]]*}.*//')"
+  if ! printf '%s' "$wcmd" | grep -Eq '[;&|`]|\\n|\$\(|(^|[[:space:]])(switch|checkout|reset|update-ref|symbolic-ref|branch|worktree|-C)([[:space:]]|$)'; then
+    case "$(git symbolic-ref --quiet --short HEAD 2>/dev/null)" in
+      wip/*) exit 0 ;;
+    esac
+  fi
 fi
 
 if [ "$mode" = "stop" ]; then

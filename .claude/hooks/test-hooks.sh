@@ -156,6 +156,19 @@ git switch -q -c wip/demo2
 row "wip/demo2 브랜치: 테스트 실패 앱 commit → 허용(다른 컴퓨터로 옮기기)" 통과 "$(run "$(bash_json "git commit -m x")" check-tests.sh commit)"
 row "wip 브랜치에서 wip:main 으로 바로 push → 막힘" 막힘 "$(run "$(bash_json "git push origin wip/demo2:main")" guard-git.sh)"
 row "wip 브랜치에서 그냥 push → 통과" 통과 "$(run "$(bash_json "git push -u origin wip/demo2")" guard-git.sh)"
+row "wip 브랜치에서 'git switch main && git commit' 이어 붙이기 → 예외 없음(막힘)" 막힘 "$(run "$(bash_json "git switch main && git commit -m x")" check-tests.sh commit)"
+row "wip 브랜치에서 'git checkout main; git commit' → 예외 없음(막힘)" 막힘 "$(run "$(bash_json "git checkout main; git commit -m x")" check-tests.sh commit)"
+row "wip 브랜치에서 'git switch main && git merge wip/demo2' → 막힘" 막힘 "$(run "$(bash_json "git switch main && git merge wip/demo2")" guard-git.sh)"
+row "따옴표로 감싼 'wip/demo2:main' push → 막힘" 막힘 "$(run "$(bash_json "git push origin 'wip/demo2:main'")" guard-git.sh)"
+row "push.default 바꾸기(-c push.default=upstream) → 막힘" 막힘 "$(run "$(bash_json "git -c push.default=upstream push")" guard-git.sh)"
+row "wip 브랜치 이름을 main으로 바꾸기(branch -M) → 막힘" 막힘 "$(run "$(bash_json "git branch -M wip/demo2 main")" guard-git.sh)"
+row "update-ref로 main 옮기기 → 막힘" 막힘 "$(run "$(bash_json "git update-ref refs/heads/main wip/demo2")" guard-git.sh)"
+row "main에서 reset --hard wip/demo2 → 막힘" 막힘 "$(run "$(bash_json "git reset --hard wip/demo2")" guard-git.sh)"
+row "따옴표 섞은 merge 'wip/demo2' → 막힘" 막힘 "$(run "$(bash_json "git merge 'wip/demo2'")" guard-git.sh)"
+git branch -q main "$base_branch" 2>/dev/null   # (시험 저장소 기본 브랜치가 master일 때 main을 만들어 둠)
+git branch -q --set-upstream-to=main 2>/dev/null
+row "wip 브랜치 추적 설정이 main인데 그냥 push → 막힘" 막힘 "$(run "$(bash_json "git push")" guard-git.sh)"
+git branch -q --unset-upstream 2>/dev/null
 git switch -q "$base_branch"
 row "main 브랜치: 테스트 실패 앱 commit → 그대로 막힘" 막힘 "$(run "$(bash_json "git commit -m x")" check-tests.sh commit)"
 row "main에서 git merge wip/demo2(그대로 합치기) → 막힘" 막힘 "$(run "$(bash_json "git merge wip/demo2")" guard-git.sh)"

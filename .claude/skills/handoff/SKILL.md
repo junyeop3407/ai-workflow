@@ -29,9 +29,9 @@ description: Use when a step of work is finished, before stopping a session, or 
 ## 다른 컴퓨터로 옮길 때 (집 Windows ↔ 밖 Mac, 사장 결정 2026-11-23)
 사장이 "나갈게", "마무리해 줘", "맥에서 할게"처럼 말하면 위 순서대로 하되, **테스트가 아직 실패하는 중**(구현 중)이면 main 대신 **임시 브랜치**로 올린다.
 1. 테스트가 통과하면 → 위 순서 그대로(main).
-2. 실패 중이면 → `git switch -c wip/<앱>`(이미 있으면 `git switch wip/<앱>`) → 위 3·4번(HANDOFF에 "임시 브랜치 wip/<앱>에서 구현 중, 실패 N개: …"를 다음 할 일 맨 위에) → `git add <앱 폴더>` → `git commit -m "<앱>: 구현 중 옮김(테스트 N/M) — 다른 컴퓨터에서 이어 하려고"` → `git push -u origin wip/<앱>`. 커밋 훅은 `wip/` 브랜치에서만 실패 상태 커밋을 허용한다. 승인된 테스트 잠금·비밀값 검사는 그대로 돈다.
+2. 실패 중이면 → `git switch -c wip/<앱>`(이미 있으면 `git switch wip/<앱>`) → 위 3·4번(HANDOFF에 "임시 브랜치 wip/<앱>에서 구현 중, 실패 N개: …"를 다음 할 일 맨 위에) → `git add <앱 폴더>` → `git commit -m "<앱>: 구현 중 옮김(테스트 N/M) — 다른 컴퓨터에서 이어 하려고"` → `git push -u origin wip/<앱>`. 커밋 훅은 `wip/` 브랜치에서만 실패 상태 커밋을 허용한다. 승인된 테스트 잠금·비밀값 검사는 그대로 돈다. 예외는 **`git commit -m "…"` 하나만 있는 명령**일 때만 — 다른 명령을 `;`·`&&`·`|`로 붙이거나 메시지에 `;`·`&`·`|`·영어 switch·checkout·reset·branch·worktree가 들어가면 예외 없이 막힌다(브랜치를 바꿔 속이는 것 차단). 브랜치 바꾸기는 커밋 전에 따로 한 줄로.
 3. 사장에게: "임시 브랜치 wip/<앱>에 올렸어요. Mac에서 열면 세션 시작 점검이 알려 줍니다."
 - **이어 받을 때**(다른 컴퓨터): 세션 시작 점검이 원격의 `wip/…`를 알려 주면 `git switch wip/<앱>` → `git pull` → 이어서 구현.
-- **다시 main으로**(테스트가 다 통과하면): wip에서 커밋·푸시 → `git switch main` → `git pull` → `git merge --squash wip/<앱>` → `git commit -m "<앱>: <한 일> — 임시 브랜치 합침"`(이 커밋에서 테스트 확인) → `git push` → 로컬 `git branch -D wip/<앱>`. 그대로 합치기(`git merge wip/…`·cherry-pick·pull)와 `…:main` 푸시는 훅이 막는다.
+- **다시 main으로**(테스트가 다 통과하면): wip에서 커밋·푸시 → `git switch main` → `git pull` → `git merge --squash wip/<앱>` → `git commit -m "<앱>: <한 일> — 임시 브랜치 합침"`(이 커밋에서 테스트 확인) → `git push` → 로컬 `git branch -D wip/<앱>`. 그대로 합치기(`git merge wip/…`·cherry-pick·`pull … wip/…`·`reset … wip/…`), `…:main` 푸시(따옴표로 감싸도), 추적 대상이 main인 wip에서 push, 푸시·추적 설정 바꾸기, main 이름 바꾸기·강제 옮기기·update-ref는 훅이 막는다. 남은 위험: 훅은 명령 글자를 읽어 판단하므로 글자로 드러나지 않는 길(스크립트 파일 안에서 git 실행 등)은 못 본다 — 그래서 main 합치기는 이 절차대로만 한다.
 - **원격 임시 브랜치 지우기는 Claude가 못 한다**(브랜치 삭제는 훅이 막음, 안전 검사도 풀어 주지 않음). 합친 뒤 사장에게 이 한 줄을 붙여 넣어 달라고 한다: `! git push origin --delete wip/<앱>` — 안 지워도 문제는 없고, 세션 시작 점검에 계속 보일 뿐이다.
 - 한 앱에 임시 브랜치는 하나만. main에 합치기 전에 다른 앱 일을 시작하지 않는다(두 브랜치에 흩어지지 않게).

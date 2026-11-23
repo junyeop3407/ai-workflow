@@ -60,21 +60,36 @@ if [ -n "$pushseg" ]; then
     && block "'+브랜치' 형태의 푸시는 강제 푸시와 같습니다."
   printf '%s' "$pushseg" | grep -Eq '(--delete|--mirror|[[:space:]]:[^[:space:]]+)' \
     && block "원격 브랜치 삭제·미러 푸시는 막혀 있습니다."
-  printf '%s' "$pushseg" | grep -Eq '[^[:space:]]:(refs/heads/)?(main|master)([[:space:]]|$)' \
+  pushq="$(printf '%s' "$pushseg" | tr -d "\"'")"   # 따옴표로 감싸 피하지 못하게
+  printf '%s' "$pushq" | grep -Eq '[^[:space:]]:(refs/heads/)?(main|master)([[:space:]]|$)' \
     && block "다른 브랜치를 main으로 바로 푸시(…:main)하면 테스트 확인을 건너뜁니다. main에서 합친 뒤 그냥 git push 하세요."
+  # 임시 브랜치에서 그냥 push 할 때 실제로 어디로 가는지(@{push})까지 본다 — 추적 설정이 main이면 막음
+  case "$(git symbolic-ref --quiet --short HEAD 2>/dev/null)" in
+    wip/*)
+      for dest in "$(git rev-parse --abbrev-ref '@{push}' 2>/dev/null)" "$(git rev-parse --abbrev-ref '@{upstream}' 2>/dev/null)"; do
+        case "$dest" in */main|*/master|main|master) block "이 임시 브랜치는 추적·push 대상이 $dest 입니다(main으로 갈 수 있음). 'git push -u origin <같은 wip 이름>'으로 올리세요." ;; esac
+      done ;;
+  esac
 fi
+printf '%s' "$cmd" | grep -Eq 'push\.default|remote\.[^[:space:]]*\.push|branch\.[^[:space:]]*\.merge' \
+  && block "푸시·추적 설정(push.default·remote.*.push·branch.*.merge)을 바꾸면 임시 브랜치가 main으로 갈 수 있습니다. 설정은 그대로 두세요."
 # 임시 브랜치(wip/…)는 테스트가 실패해도 커밋되므로(check-tests 예외), 다른 브랜치로 가져올 때는
 # 한 커밋으로 묶어(--squash) 다시 커밋하게 한다 — 그 git commit 에서 check-tests가 테스트를 돌린다.
-cur_branch="$(git symbolic-ref --quiet --short HEAD 2>/dev/null)"
-case "$cur_branch" in
-  wip/*) ;;
-  *)
-    mergeseg="$(printf '%s' "$cmd" | grep -Eo 'git([[:space:]]+-[^[:space:]]+)*[[:space:]]+(merge|pull|rebase|cherry-pick)[^;&|]*')"
-    if printf '%s' "$mergeseg" | grep -q 'wip/'; then
-      printf '%s' "$mergeseg" | grep -Eq '[[:space:]]merge[[:space:]](.*[[:space:]])?--squash([[:space:]]|$)' \
-        || block "임시 브랜치(wip/…)를 그대로 합치면 테스트가 실패한 커밋이 ${cur_branch:-이 브랜치}에 들어옵니다. 'git merge --squash wip/<이름>' 뒤 'git commit -m \"…\"'로 합치세요(커밋 때 테스트 확인)."
-    fi ;;
-esac
+# 실행 전 브랜치로 판단하면 이어 붙인 명령(git switch main && git merge …)에 속으므로, 지금 브랜치와 상관없이 늘 검사한다.
+cmdq="$(printf '%s' "$cmd" | tr -d "\"'")"
+printf '%s\n' "$cmdq" | grep -Eo 'git([[:space:]]+-[^[:space:]]+)*[[:space:]]+(merge|pull|rebase|cherry-pick)[^;&|]*' | while IFS= read -r seg; do
+  printf '%s' "$seg" | grep -q 'wip/' || continue
+  printf '%s' "$seg" | grep -Eq '[[:space:]]merge[[:space:]]' && printf '%s' "$seg" | tr ' ' '\n' | grep -qx -- '--squash' && continue
+  exit 7
+done
+[ $? -eq 7 ] && block "임시 브랜치(wip/…)를 그대로 합치면 테스트가 실패한 커밋이 들어옵니다. 'git merge --squash wip/<이름>' 뒤 'git commit -m \"…\"'로 합치세요(커밋 때 테스트 확인). (임시 브랜치에서 받을 때는 그냥 git pull)"
+# main을 임시 브랜치 쪽으로 옮기는 길 막기: 브랜치 이름 바꾸기·강제 옮기기·update-ref·reset 으로 wip 커밋을 main에
+printf '%s' "$cmdq" | grep -Eq 'git([[:space:]]+-[^[:space:]]+)*[[:space:]]+branch[[:space:]]+[^;&|]*(-m|-M|-f|-F|--force|--move)[^;&|]*(main|master)' \
+  && block "브랜치 이름 바꾸기·강제 옮기기로 main을 바꾸면 테스트 확인을 건너뜁니다."
+printf '%s' "$cmdq" | grep -Eq 'git([[:space:]]+-[^[:space:]]+)*[[:space:]]+update-ref[^;&|]*(main|master)' \
+  && block "update-ref로 main을 바로 옮기는 것은 막혀 있습니다."
+printf '%s' "$cmdq" | grep -Eq 'git([[:space:]]+-[^[:space:]]+)*[[:space:]]+reset[^;&|]*wip/' \
+  && block "reset으로 임시 브랜치(wip/…) 커밋을 가져오면 테스트 확인을 건너뜁니다. 'git merge --squash'로 합치세요."
 printf '%s' "$cmd" | grep -Eq 'git[[:space:]]+(filter-branch|filter-repo)\b' \
   && block "커밋 기록 고쳐 쓰기(filter-branch/filter-repo)는 막혀 있습니다."
 printf '%s' "$cmd" | grep -Eq 'gh[^;&|]*[[:space:]]repo[[:space:]]+(delete|archive)\b' \
