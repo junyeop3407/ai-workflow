@@ -106,21 +106,29 @@ is_build_dir() {
 }
 # .gitignore로 빠진 것과 git 설정의 지문. 줄마다:
 #   D <폴더>        빌드 결과물 폴더(있음만)
-#   F <파일> <해시>  그 밖의 무시 파일(무시 폴더 안 파일까지 하나씩, 2000개까지)
-#   G <이름> <해시>  .git/config · .git/info/exclude · .git/hooks 목록
+#   F <파일> <해시>  그 밖의 무시 파일
+#   T <폴더> <해시>  그 밖의 무시 폴더 — 안의 파일 전부(개수 제한 없음)의 경로·내용을 합친 해시
+#   G <이름> <해시>  git 설정: config·config.worktree·info/*·hooks/* 내용(공용 git 폴더 포함), `git config --list` 전체(전역·시스템 포함)
+# 남은 위험(사장 확인한 선택): 빌드 결과물 폴더(node_modules 등)는 수만 개라 내용을 해시하지 않는다.
+dir_hash() { # 폴더 안 파일 전부의 "경로 내용해시" 목록 → 한 해시
+  local d="$1" f
+  find "$d" -type f 2>/dev/null | LC_ALL=C sort | while IFS= read -r f; do printf '%s %s\n' "$f" "$(git hash-object -- "$f")"; done | git hash-object --stdin
+}
 snap_ignored() {
-  local e f gd
+  local e d f
   while IFS= read -r e; do
     [ -n "$e" ] || continue
     case "$e" in
-      */) if is_build_dir "$e"; then echo "D $e"
-          else find "$e" -type f 2>/dev/null | head -n 2000 | while IFS= read -r f; do echo "F $f $(git hash-object -- "$f")"; done; fi ;;
+      */) if is_build_dir "$e"; then echo "D $e"; else echo "T $e $(dir_hash "$e")"; fi ;;
       *) echo "F $e $(git hash-object -- "$e")" ;;
     esac
   done < <(git ls-files --others --ignored --exclude-standard --directory 2>/dev/null)
-  gd="$(git rev-parse --git-dir)"
-  for f in config info/exclude; do [ -f "$gd/$f" ] && echo "G $f $(git hash-object -- "$gd/$f")"; done
-  echo "G hooks $(ls -la "$gd/hooks" 2>/dev/null | git hash-object --stdin)"
+  for d in "$(git rev-parse --git-dir)" "$(git rev-parse --git-common-dir)"; do
+    for f in config config.worktree; do [ -f "$d/$f" ] && echo "G $d/$f $(git hash-object -- "$d/$f")"; done
+    [ -d "$d/info" ] && echo "G $d/info $(dir_hash "$d/info")"
+    [ -d "$d/hooks" ] && echo "G $d/hooks $(dir_hash "$d/hooks")"
+  done | sort -u
+  echo "G config-list $(git config --show-origin --list 2>/dev/null | git hash-object --stdin)"
 }
 
 if [ "$1" = "mark" ] || [ "$1" = "check" ]; then
