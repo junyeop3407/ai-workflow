@@ -13,6 +13,7 @@
 
 mode="$1"
 G="$(cd "$(dirname "$0")" && pwd)/../skills/build-app/graph.sh"
+LOCKSH="$(cd "$(dirname "$0")" && pwd)/lock.sh"
 
 # 앱 하나의 검사 줄 실행: run_app <앱> <줄 이름> → RUN_OUT, 종료 코드 0 통과 / 1 실패 / 3 허용 안 된 명령 / 4 줄 없음
 run_app() {
@@ -29,7 +30,18 @@ run_app() {
 허용: npx playwright test, npx vitest run, npm test, npm run test, node --test, ./gradlew test, gradle test, ./mvnw test, mvn test, (python -m) pytest, bash tests/<파일>.sh (뒤에 옵션만, ; | & \$ 같은 기호 금지)"
     return 3
   fi
-  RUN_OUT="$(cd "apps/$app" && bash -c "$cmd" 2>&1)" && return 0
+  # 같은 테스트 환경(포트)은 한 번에 하나 — 두 세션·Stop 훅 둘이 동시에 돌려 "포트 사용 중"으로 서로 깨지 않게.
+  # HANDOFF '포트: 8081 5174' 줄의 포트마다 잠금, 없으면 env:port:default 하나에 줄 세움(모르면 안전하게 직렬)
+  local ports names="" p rc
+  ports="$(grep -m1 '^포트:' "$handoff" | grep -o '[0-9]\{2,5\}')"
+  for p in ${ports:-default}; do names="${names:+$names,}env:port:$p"; done
+  if [ -f "$LOCKSH" ]; then
+    RUN_OUT="$(cd "apps/$app" && bash "$LOCKSH" run "$names" --wait "${TEST_LOCK_WAIT:-1800}" --label "테스트 $app ($key)" -- bash -c "$cmd" 2>&1)"; rc=$?
+  else
+    RUN_OUT="$(cd "apps/$app" && bash -c "$cmd" 2>&1)"; rc=$?
+  fi
+  [ $rc -eq 0 ] && return 0
+  [ $rc -eq 4 ] && printf '%s' "$RUN_OUT" | grep -q "^잠금 'env:port:" && RUN_OUT="테스트 환경 잠금을 기다리다 멈췄습니다(다른 테스트가 같은 포트를 오래 씀): $RUN_OUT"
   return 1
 }
 

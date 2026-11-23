@@ -14,7 +14,19 @@ GRAPH="${GRAPH_MD:-$SDIR/graph.md}"
 HOOKS="${GRAPH_HOOKS:-$(cd "$SDIR/../../hooks" 2>/dev/null && pwd)}"
 ROOT="$(git rev-parse --show-toplevel 2>/dev/null)" || { echo "git 저장소 안에서 실행하세요." >&2; exit 1; }
 cd "$ROOT" || exit 1
-T="$(mktemp -d)"; trap 'rm -rf "$T"' EXIT
+LOCKSH="$SDIR/../../hooks/lock.sh"
+GLOCK=""; GLOCK_NAME=""
+# state.json을 고치는 명령은 앱마다 잠금(state:<앱>)을 잡고 돈다 — 세션 두 개가 동시에 고쳐 한쪽 기록이 사라지는 것을 막음
+graph_lock() { # 명령 이름
+  [ -f "$LOCKSH" ] || return 0
+  GLOCK_NAME="state:$APP"
+  GLOCK="$(bash "$LOCKSH" acquire "$GLOCK_NAME" --pid $$ --wait "${GRAPH_LOCK_WAIT:-300}" --label "graph.sh $1 $APP" 2>"$T/lockerr")" \
+    || { GLOCK=""; die 4 "[그래프 $APP] 다른 작업이 이 앱의 state.json을 쓰는 중이라 기다리다 멈췄습니다: $(cat "$T/lockerr")
+잡은 작업이 정말 도는지 확인하세요(bash .claude/hooks/lock.sh status state:$APP). 끝난 작업이면 다음 실행 때 자동으로 회수됩니다."; }
+  export LOCK_HELD="${LOCK_HELD:+$LOCK_HELD }$GLOCK_NAME"
+}
+graph_unlock() { [ -n "$GLOCK" ] && bash "$LOCKSH" release "$GLOCK_NAME" "$GLOCK" >/dev/null 2>&1; GLOCK=""; }
+T="$(mktemp -d)"; trap 'graph_unlock; rm -rf "$T"' EXIT
 NT="$T/nodes"; FP="$T/fails"; CT="$T/checklist"; KV="$T/kv"; AP="$T/ap"; LG="$T/lg"
 : > "$KV"; : > "$AP"; : > "$LG"
 
@@ -181,7 +193,13 @@ write_state() {
       echo "  \"log\": []"
     fi
     echo "}"
-  } > "$STATE.tmp" && mv "$STATE.tmp" "$STATE"
+  } > "$STATE.tmp" || return 1
+  # 세대 번호 확인: 잠금을 잃었으면(회수됨) 늦게 깨어난 이 작업은 쓰지 않는다
+  if [ -n "$GLOCK" ] && ! bash "$LOCKSH" check "$GLOCK_NAME" "$GLOCK"; then
+    rm -f "$STATE.tmp"; GLOCK=""
+    die 4 "[그래프 $APP] state.json 잠금을 잃어서 쓰지 않았습니다(다른 작업이 회수함). 상태를 다시 읽고 이어 가세요: graph.sh status $APPDIR"
+  fi
+  mv "$STATE.tmp" "$STATE"
   update_handoff
 }
 
@@ -864,6 +882,12 @@ cmd_status() {
   [ -n "$(kget lf.from)" ] && say "마지막 실패: $(kget lf.from) → $(kget lf.to) ($(kget lf.reason), $(kget lf.at))"
   [ -n "$(kget score.last)" ] && say "완성도: $(kget score.last) (바퀴 $(kget score.rounds), 기록 $(kget score.history))"
   say "승인 기록: $(grep -c '' "$AP")건"
+  # 잠금(lock.sh): 이 앱 state와 테스트 포트 — 잡힘·대기·지연
+  if [ -f "$LOCKSH" ]; then
+    local lk; lk="$( { bash "$LOCKSH" status "state:$APP"; bash "$LOCKSH" status "env:port"; } 2>/dev/null | grep -v '^잡힌 잠금 없음')"
+    [ -n "$lk" ] && say "잠금:
+$(printf '%s\n' "$lk" | sed 's/^/  /')"
+  fi
 }
 
 cmd_init() {
@@ -974,6 +998,7 @@ case "$cmd" in
   ""|-h|--help|help) usage; exit 0 ;;
 esac
 set_app "$1"; shift 2>/dev/null
+case "$cmd" in status|current|get) ;; *) graph_lock "$cmd" ;; esac   # 읽기만 하는 명령은 잠그지 않음(다른 훅이 안에서 불러도 막히지 않게)
 case "$cmd" in
   init) cmd_init ;;
   migrate) cmd_migrate ;;

@@ -33,14 +33,23 @@ stop_server() {
   if port_open; then echo "서버가 남았을 수 있음: 포트 $PORT (이 스크립트가 켠 pid $pid). 직접 확인해 끄세요." >&2; return 1; fi
   pid=""
 }
-cleanup() { local rc=$?; trap - EXIT INT TERM; stop_server || rc=1; exit $rc; }
+LOCKSH="${LOCKSH:-$(git rev-parse --show-toplevel)/.claude/hooks/lock.sh}"
+LTOK=""
+cleanup() { local rc=$?; trap - EXIT INT TERM; stop_server || rc=1; [ -n "$LTOK" ] && bash "$LOCKSH" release "env:port:$PORT" "$LTOK" >/dev/null 2>&1; exit $rc; }
 
-# 0. 포트가 이미 쓰이고 있으면 아무것도 켜지 않고 멈춘다
+# 0-1. 이 포트를 쓰는 다른 테스트·서버가 끝날 때까지 줄 서서 기다린다(lock.sh, 먼저 온 순서).
+#      테스트 실행 줄이 이미 같은 포트 잠금을 잡았으면 기다리지 않는다.
+if [ -f "$LOCKSH" ]; then
+  LTOK="$(bash "$LOCKSH" acquire "env:port:$PORT" --pid $$ --wait "${PORT_WAIT:-1800}" --label "backend.sh")" \
+    || { echo "포트 $PORT 잠금을 기다리다 멈췄습니다(다른 테스트가 오래 씀): bash .claude/hooks/lock.sh status env:port" >&2; exit 1; }
+fi
+
+# 0-2. 포트가 이미 쓰이고 있으면(잠금 밖의 프로그램) 아무것도 켜지 않고 멈춘다
+trap cleanup EXIT
 if port_open; then
   echo "포트 $PORT 사용 중 — 남은 서버를 끄세요. (이 스크립트는 남의 프로세스를 끄지 않습니다)" >&2
   exit 1
 fi
-trap cleanup EXIT
 trap 'exit 130' INT TERM
 
 # ① 부품 테스트 ② 서버 만들기

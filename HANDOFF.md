@@ -33,7 +33,8 @@
 | 앞단계 보완 | 분석 `docs/front-stage-review.md`(사장 레퍼런스 3개 + Anthropic·grill-me·Spec Kit·EARS·Shape Up·사전 부검). 반영 ①~⑧: 성공 기준·빈칸 점검표 인터뷰(`SKILL.md` "기획 인터뷰", 견본 `templates/requirements.md`), Gemini 기획서 비판(`doc-review.sh`, agy), 사전 부검(`docs/premortem.md`), 수용 기준 `F1-1`, graph.sh 검사 `req`·`trace`·`undecided`, 되돌리기 어려운 동작 확인 절차, ★ 검토 요청 틀. 추가 ⑨~⑬도 반영: 수용 기준마다 `— 예:` 예시, 출시 안내문 3문장 + 예상 질문, 기능 `[1차|나중·꼭|많을수록|놀람]`(1차만으로 처음부터 끝까지 한 번 돌기, 나중은 테스트·점수에서 빠짐), ★기획 검토 때 회색 상자 화면 초안(`docs/wireframe/`, 절차만) | ✅ 2026-11-22 |
 | 조직 개편 ① 개발팀 | 사장의 "AI 가상오피스 조직 명세"(비서 제외)를 적용. 정한 것: Codex = 개발팀 **리뷰·통합 확인**(구현 안 함, 교차 리뷰 독립 유지), 백엔드·프론트는 **진짜 팀 에이전트** `backend-dev`·`frontend-dev`(sonnet, bb·bf에서 실제로 코드를 짬, 메인은 통합·업무 요청서·커밋). 파일 경계 훅 `team-files.sh`(Edit·Write 즉시 차단 + Bash로 쓴 것은 맡기기 직전 `mark`·받은 직후 `check`로 저장소 전체 비교, **목록에 없는 파일은 기본 거부** — 테스트·러너 설정·package.json·vite.config·`docs/`·.gitignore·state.json은 둘 다 못 고침, 경로는 저장소 기준·대소문자 무시·`//` `./` `../` 거부). 자동 보안 리뷰 지적 4개(경로 우회 2·check 범위·기본 허용) + 2차 4개(이름 바꾸기로 숨기기·기준점 파일 고쳐 쓰기 → 기준 표를 git 객체 해시로 메인이 들고 있음·Windows 특수 이름·무시 파일 내용/git 설정 비교) 반영. 조직도·책임표·업무 요청서 `docs/org.md`. 자동 루프(Stop 훅)는 메인에 그대로. 시험 test-hooks --settings 166개·test-graph 통과 | ✅ 2026-11-23 |
 | 조직 개편 ② 법무팀 | 분석 `docs/org-phase2-review.md`(사장 OK: 법무 → 잠금 도구 → 경영 순서). `legal` 에이전트(opus, `docs/legal.md`만 씀·Bash 없음, 법률 자문 아님). 그래프 노드 `lg`(ok-req 뒤, 검사 `legal`: 안내 문구·판정 줄 형식·근거·RED는 조치·기획서 외부 자료 모두 판정) → `ok-lg`(★ YELLOW·RED는 조건부·대체·빼기, 대체·빼기면 req로). 외부 자료·개인정보가 둘 다 없으면 "법무 해당 없음"으로 둘 다 건너뜀. 기획서 견본에 `## 외부 자료·데이터`·`## 개인정보`. sa에서 출시 전 법무 점검, 체크리스트 20 → 22개(21 라이선스 고지, 22 RED 안 씀·YELLOW 조건대로). 시험 test-hooks --settings 172개·test-graph 통과 | ✅ 2026-11-23 |
-| 조직 개편 ③ 잠금 도구·경영팀 | 자원별 잠금 `lock.sh`(state:<앱>·env:port·git, FIFO·lease·세대 번호) → 경영팀 `manager`(요구사항 변경 영향·막힘·잠금 지연 때만). 실제 앱으로 개발팀·법무팀 흐름은 아직 안 돌려 봄 | ⬜ 다음 |
+| 조직 개편 ③ 잠금 도구 | 자원별 잠금 `.claude/hooks/lock.sh`(사장의 동시성 명세): `state:<앱>`(graph.sh 쓰는 명령 전부, 쓰기 직전 세대 번호 확인) · `env:port:<번호>`(테스트 실행은 HANDOFF `포트:` 줄마다, 없으면 `env:port:default` 한 줄, `backend.sh`도). 원자적 번호표(mkdir)·FIFO·잡은 프로세스가 끝났을 때만 회수(시간만 지나면 '지연' 표시)·세대 번호·다시 들어가기·기록 `.git/locks/log`. git 커밋·푸시는 git 자체 잠금이 있고 실패가 안전해서 안 잠금. 만들다 찾은 버그: 치워진 번호를 다시 받으면 죽은 대기자가 남의 차례를 가져감 → 번호표에 고유 꼬리표 + 내 번호표가 없으면 그만둠. 시험 `test-lock.sh` 22개(3번 연속 통과)·test-hooks 172개·test-graph(잠금 6개 추가) 통과 | ✅ 2026-11-23 |
+| 조직 개편 ④ 경영팀 | 경영팀 `manager`(요구사항 변경 영향·막힘 보고·잠금 지연 때만, 읽기 전용, `docs/ops.md`). 실제 앱으로 개발팀·법무팀 흐름은 아직 안 돌려 봄 | ⬜ 다음 |
 | 다음 | 첫 앱 만들기 (`apps/<앱이름>/`) | ⬜ 다음 |
 | 교차 리뷰 | Codex + Gemini CLI 리뷰 (**둘 다 필수**, 변경분 1라운드, README 참고) | ✅ 준비됨 |
 | 구조 정리 | CLAUDE.md를 rules·skills·hooks·agents로 나눔 (130 → 93줄) | ✅ 2026-11-01 |
@@ -62,6 +63,7 @@
 │   └── legal.md                           법무팀: lg·sa에서 docs/legal.md 판정 (그 파일만)
 ├── docs/org.md                            조직도·책임표·개발팀 파일 경계·업무 요청서
 ├── .claude/hooks/team-files.sh            개발팀 에이전트 파일 경계 (훅 + check·owner)
+├── .claude/hooks/lock.sh                  자원별 잠금 (state:<앱>·env:port, FIFO·회수·세대 번호) + test-lock.sh
 ├── .claude/agent-memory/                  qa-reviewer·red-team 메모리 (커밋됨, 일반 패턴만)
 ├── .claude/skills/weekly-review/SKILL.md  /weekly-review 주간 회고 (반복된 실수 → 규칙 후보 최대 3개)
 ├── docs/last-weekly-review.txt            마지막 주간 회고 날짜 (세션 시작 훅이 읽음)

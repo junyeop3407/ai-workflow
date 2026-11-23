@@ -255,6 +255,28 @@ for n in ip ok-ip ui dd ok-ui ok-dd bb cb; do G confirm apps/m1 $n 통과 >/dev/
 G confirm apps/m1 bf 대기 >/dev/null; G confirm apps/m1 cf 대기 >/dev/null
 row "migrate: 확인 필요를 다 정하면 첫 대기 노드부터" "bf" "$(cur_of m1)"
 row "lint: graph.md 점검 통과" 0 "$(rc G lint)"
+# ---- 잠금(lock.sh): state:<앱>·env:port ----
+LK="$H/lock.sh"
+mkstate z1 req 진행
+sleep 30 >/dev/null 2>&1 & zh=$!; ztok="$(bash "$LK" acquire state:z1 --pid $zh)"
+row "다른 작업이 state 잠금을 잡음 → 쓰는 명령은 기다리다 멈춤(4)" 4 "$(GRAPH_LOCK_WAIT=2 rc G stuck apps/z1 req 보고 시험)"
+row "그동안 읽는 명령(current)은 그대로" req "$(cur_of z1)"
+kill $zh 2>/dev/null; wait $zh 2>/dev/null
+row "잡은 작업이 끝남 → 자동 회수하고 쓰는 명령 진행" 0 "$(rc G stuck apps/z1 req 보고 시험)"
+G resume apps/z1 req >/dev/null 2>&1
+n0=$(grep -c '"do": ' "$(S z1)")
+G stuck apps/z1 req 보고 "동시1" >/dev/null 2>&1 & c1=$!; G stuck apps/z1 req 보고 "동시2" >/dev/null 2>&1 & c2=$!; wait $c1 $c2
+row "쓰는 명령 둘을 동시에 → 기록 둘 다 남음(덮어쓰기 없음)" 2 "$(( $(grep -c '"do": ' "$(S z1)") - n0 ))"
+mkstate z2 tr 진행; printf 'echo "  1 passed (0.1s)"\n' > apps/z2/tests/run.sh
+sleep 30 >/dev/null 2>&1 & zh=$!; ztok="$(bash "$LK" acquire env:port:default --pid $zh)"
+row "포트 잠금을 다른 테스트가 잡음 → 테스트 실행은 기다리다 실패 + 이유" "1 잠금" "$(TEST_LOCK_WAIT=2 bash "$H/check-tests.sh" app apps/z2 >"$tmp/z2.out" 2>&1; echo "$? $(grep -q '테스트 환경 잠금' "$tmp/z2.out" && echo 잠금)")"
+kill $zh 2>/dev/null; wait $zh 2>/dev/null
+row "포트 잠금이 풀림 → 테스트 실행 통과" 0 "$(bash "$H/check-tests.sh" app apps/z2 >/dev/null 2>&1; echo $?)"
+printf '포트: 8091\n' >> apps/z2/HANDOFF.md
+sleep 30 >/dev/null 2>&1 & zh=$!; ztok="$(bash "$LK" acquire env:port:default --pid $zh)"
+row "HANDOFF에 '포트: 8091' → default 잠금과 상관없이 바로 실행" 0 "$(TEST_LOCK_WAIT=2 bash "$H/check-tests.sh" app apps/z2 >/dev/null 2>&1; echo $?)"
+kill $zh 2>/dev/null; wait $zh 2>/dev/null
+
 # ---- 법무 판정서 검사 (lg) ----
 mklg() { mkstate "$1" lg 진행; mkreq "apps/$1"; printf '## 외부 자료·데이터\n- 향수 목록 — 출처: https://example.com — 쓰는 방식: 화면 표시\n' >> "apps/$1/docs/requirements.md"; }
 lgok='이 문서는 AI가 정리한 것이며 법률 자문이 아님.\n## 판정\n'
