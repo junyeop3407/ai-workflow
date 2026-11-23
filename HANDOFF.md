@@ -1,6 +1,7 @@
 # HANDOFF — 다음 세션 시작 가이드
 
 마지막 갱신: 2026-11-23 (조직 개편 ①~④: 개발팀 에이전트·법무팀·잠금 도구·경영팀)
+마지막 작업 컴퓨터: Windows 2026-11-23 (main)
 
 ## 1. 한 줄 요약
 이석균 선배님 특강(AI 기초)의 방식대로 앱을 만드는 **작업장 견본**이다. 사용자는 **사장**, Claude의 팀들(기획·디자인·개발(백엔드·프론트엔드 에이전트)·QA·보안 검증·법무·경영, 조직은 `docs/org.md`)은 **직원**이고, 모든 팀의 결과물은 사장 검토를 받는다. 규칙, `/build-app` 스킬, 교차 리뷰, 훅, **그래프(앱 작업이 graph.md 흐름을 따라 자동으로 흐름, 사장은 ★에서 보기만 누름)** 가 준비되어 있고 아직 만든 앱은 없다. **다음 할 일: 첫 앱 만들기 (`/build-app 만들고 싶은 것`).**
@@ -10,9 +11,15 @@
 - 첫 마디: **"HANDOFF.md 읽고 이어서 해 줘"**, 새 앱은 **`/build-app 만들고 싶은 것`**
 - 다른 컴퓨터: `git pull` 먼저
 
+### 집 Windows ↔ 밖 Mac (동시에는 안 씀)
+- **열 때**: 세션 시작 점검이 알려 준다 — 받을 커밋 / 이 컴퓨터에 안 올린 커밋(푸시 잊음) / 두 갈래 / 다른 컴퓨터가 구현 중 올린 임시 브랜치(`wip/<앱>`) / 커밋 안 한 변경 / 지난번 작업 컴퓨터. Claude가 사장에게 알리고 정리한 뒤 시작한다.
+- **나갈 때**: "마무리해 줘" 한마디(`/handoff`). 테스트가 통과하면 main으로, 구현 중(실패)이면 임시 브랜치 `wip/<앱>`으로 올린다(그 브랜치에서만 실패 상태 커밋 허용). 다른 컴퓨터에서 `git switch wip/<앱>`으로 이어 하고, 다 통과하면 `--squash`로 main에 합친다.
+- **따라오지 않는 것**(각 컴퓨터에서): `node_modules`·빌드 결과물(잠금 파일로 다시 설치), `.env` 비밀값(비밀번호 관리자에서 직접), `samples/`, Codex·Gemini·context7 로그인, `GEMINI_API_KEY`.
+- **컴퓨터마다 하는 일**: iOS 빌드는 Mac(Xcode)만. 나머지는 둘 다.
+
 ## 3. 처음 쓰는 컴퓨터 준비 (한 번만)
-1. git 설치 (Windows는 Git Bash가 함께 깔림. 훅이 bash로 돈다)
-2. GitHub CLI: `winget install GitHub.cli` → `gh auth login --web` → `gh auth setup-git`
+1. git 설치 (Windows는 Git Bash가 함께 깔림. 훅이 bash로 돈다). **Mac**: 터미널에서 `xcode-select --install`(git·bash 포함) → Homebrew 설치(https://brew.sh 의 한 줄)
+2. GitHub CLI: `winget install GitHub.cli` (Mac `brew install gh`) → `gh auth login --web` → `gh auth setup-git`
 3. 저장소 받기: `git clone <이 저장소 주소>`
 4. 이 폴더를 Claude Code로 처음 열면 superpowers·modern-web-guidance·context7·chrome-devtools-mcp·ecc 플러그인 설치를 묻는다 → 모두 "예" (ecc는 개인 개발자 affaan-m의 공개 플러그인. 이 저장소 설정이 공식 저장소 `affaan-m/ECC`에서만 받게 되어 있다) (chrome-devtools는 Chrome 브라우저가 깔려 있어야 함)
    - context7은 처음 한 번 로그인해야 쓸 수 있다: `/mcp` → context7 → Authenticate → 열리는 브라우저에서 로그인. `claude mcp list`에 context7이 `Needs authentication`으로 나오면 아직 안 한 것
@@ -22,6 +29,7 @@
    - Node.js (프론트엔드팀·디자인팀·QA팀의 React, Vite, Tailwind, Playwright, Vitest): `winget install --id OpenJS.NodeJS.LTS -e` (Mac `brew install node`)
    - Playwright 브라우저 (QA팀, 앱 폴더에서 한 번): `npx playwright install chromium webkit` (webkit은 Safari 엔진, 호환성 테스트용)
    - 파이썬으로 테스트하는 앱일 때만: `py -m pip install pytest playwright` → `py -m playwright install chromium` (Mac은 `python3`)
+7. **Mac에서 처음 한 번 시험**: `bash .claude/hooks/test-hooks.sh --settings` · `bash .claude/hooks/test-lock.sh` · `bash .claude/hooks/test-graph.sh` — 모두 "전부 기대대로"면 Mac 준비 끝(시험 스크립트는 Mac sed에 맞춰 고쳤지만 Mac에서 실제로 돌려 본 적은 아직 없음)
 
 ## 4. 로드맵
 | 단계 | 내용 | 상태 |
@@ -35,6 +43,8 @@
 | 조직 개편 ② 법무팀 | 분석 `docs/org-phase2-review.md`(사장 OK: 법무 → 잠금 도구 → 경영 순서). `legal` 에이전트(opus, `docs/legal.md`만 씀·Bash 없음, 법률 자문 아님). 그래프 노드 `lg`(ok-req 뒤, 검사 `legal`: 안내 문구·판정 줄 형식·근거·RED는 조치·기획서 외부 자료 모두 판정) → `ok-lg`(★ YELLOW·RED는 조건부·대체·빼기, 대체·빼기면 req로). 외부 자료·개인정보가 둘 다 없으면 "법무 해당 없음"으로 둘 다 건너뜀. 기획서 견본에 `## 외부 자료·데이터`·`## 개인정보`. sa에서 출시 전 법무 점검, 체크리스트 20 → 22개(21 라이선스 고지, 22 RED 안 씀·YELLOW 조건대로). 시험 test-hooks --settings 172개·test-graph 통과 | ✅ 2026-11-23 |
 | 조직 개편 ③ 잠금 도구 | 자원별 잠금 `.claude/hooks/lock.sh`(사장의 동시성 명세): `state:<앱>`(graph.sh 쓰는 명령 전부, 쓰기 직전 세대 번호 확인) · `env:port:<번호>`(테스트 실행은 HANDOFF `포트:` 줄마다, 없으면 `env:port:default` 한 줄, `backend.sh`도). 원자적 번호표(mkdir)·FIFO·잡은 프로세스가 끝났을 때만 회수(시간만 지나면 '지연' 표시)·세대 번호·다시 들어가기·기록 `.git/locks/log`. git 커밋·푸시는 git 자체 잠금이 있고 실패가 안전해서 안 잠금. 만들다 찾은 버그: 치워진 번호를 다시 받으면 죽은 대기자가 남의 차례를 가져감 → 번호표에 고유 꼬리표 + 내 번호표가 없으면 그만둠. 시험 `test-lock.sh` 22개(3번 연속 통과)·test-hooks 172개·test-graph(잠금 6개 추가) 통과 | ✅ 2026-11-23 |
 | 조직 개편 ④ 경영팀 | `manager` 에이전트(opus, `docs/ops.md`만 씀·Bash 없음, 제안만 — 순서·잠금은 직접 안 바꿈). 부르는 때: ① 요구사항 변경(먼저 묻기 `사장` 실패 엣지 = ok-qa→tl·req, ok-lg→req) — **graph.sh가 fail 전에 `## 영향 분석: <출발> → <보낼 곳>`(영향·다시 돌 노드·추천)과 출발 ★ 승인 기록을 확인, 없으면 거부** ② 사장 보고(②) 전 막힘 분석 ③ 잠금 지연. 순서·상태·브레이크는 graph.sh·lock.sh가 그대로 함(중복 없음). 시험 test-hooks --settings 177개·test-lock 22개·test-graph 통과 | ✅ 2026-11-23 |
+| 두 컴퓨터(집 Windows ↔ 밖 Mac) | 세션 시작 동기화 점검(받을 것·푸시 잊음·두 갈래·원격 임시 브랜치·커밋 안 한 변경·지난번 컴퓨터, 원격은 fetch로 읽기만). **사장 결정: 임시 브랜치 `wip/<앱>`에서만 실패 상태 커밋 허용**(check-tests), main으로 가는 뒷문은 guard-git이 막음(그대로 merge·cherry-pick·pull, `…:main` 푸시 — `merge --squash` 뒤 테스트 통과 커밋만). 원격 wip 삭제는 안전 검사가 훅 완화를 막아 사장이 `!`로 직접. `/handoff`에 옮길 때 절차·`마지막 작업 컴퓨터:` 줄. 시험 스크립트 Mac sed 호환(`sedi`, `{…;}`, CRLF는 awk). 시험 test-hooks --settings 193개·test-lock 22개·test-graph 통과(Mac 실행은 아직) | ✅ 2026-11-23 |
+| Docker | 분석 `docs/docker-review.md`(dock.sh 정책 입구 + 훅 + 견본, DB·레드팀 격리·같은 테스트 환경·Android). 1단계부터 사장 검토 대기 | ⬜ 다음 |
 | 다음 | 첫 앱으로 새 조직(개발팀 에이전트·법무·경영·잠금) 흐름을 실제로 한 바퀴 돌려 보기 | ⬜ 다음 |
 | 교차 리뷰 | Codex + Gemini CLI 리뷰 (**둘 다 필수**, 변경분 1라운드, README 참고) | ✅ 준비됨 |
 | 구조 정리 | CLAUDE.md를 rules·skills·hooks·agents로 나눔 (130 → 93줄) | ✅ 2026-11-01 |

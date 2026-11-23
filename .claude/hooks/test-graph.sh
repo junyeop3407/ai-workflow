@@ -5,6 +5,8 @@
 # 사용: bash .claude/hooks/test-graph.sh   — 기대와 다른 줄이 하나라도 있으면 exit 1
 # 테스트·리뷰·레드팀 결과는 모두 가짜(가정)다. node 가 없으면 backend.sh 시험은 "확인 못 함".
 
+# 제자리 고치기: GNU(Windows Git Bash)·BSD(Mac) sed 둘 다 되는 방식 — sed -i 대신
+sedi() { local f="${*: -1}"; sed -i.bak "$@" && rm -f "$f.bak"; }
 src="$(git rev-parse --show-toplevel)" || exit 1
 H="$src/.claude/hooks"
 GS="$src/.claude/skills/build-app/graph.sh"
@@ -32,11 +34,11 @@ mkstate() { # 앱 현재노드 상태
   printf '# %s\n현재 단계: 4\n테스트 실행: `bash tests/run.sh`\n백엔드 테스트: `bash tests/backend.sh`\n' "$1" > "apps/$1/HANDOFF.md"
   printf 'exit 0\n' > "apps/$1/tests/run.sh"; printf 'exit 0\n' > "apps/$1/tests/backend.sh"
   G init "apps/$1" >/dev/null 2>&1
-  sed -i -E '/^    "/ s/"status": "[^"]*"/"status": "통과"/' "$(S "$1")"
-  sed -i -E 's/^(    "done": \{"status": )"통과"/\1"대기"/' "$(S "$1")"
-  sed -i -E "s/\"current\": \[[^]]*\]/\"current\": [\"$2\"]/; s/^(    \"$2\": \{\"status\": )\"[^\"]*\"/\1\"$3\"/" "$(S "$1")"
+  sedi -E '/^    "/ s/"status": "[^"]*"/"status": "통과"/' "$(S "$1")"
+  sedi -E 's/^(    "done": \{"status": )"통과"/\1"대기"/' "$(S "$1")"
+  sedi -E "s/\"current\": \[[^]]*\]/\"current\": [\"$2\"]/; s/^(    \"$2\": \{\"status\": )\"[^\"]*\"/\1\"$3\"/" "$(S "$1")"
 }
-setst() { sed -i -E "s/^(    \"$2\": \{\"status\": )\"[^\"]*\"/\1\"$3\"/" "$(S "$1")"; }
+setst() { sedi -E "s/^(    \"$2\": \{\"status\": )\"[^\"]*\"/\1\"$3\"/" "$(S "$1")"; }
 
 # =============== A. 가짜 앱 이야기: 사장은 ★에서 보기만 누르고 명령은 0번 ===============
 A=apps/shop
@@ -146,7 +148,7 @@ printf '## 꼭 되어야 할 기능\n- F1 장바구니 담기\n' > $A/docs/requi
 printf -- '- F1 → 장바구니 담기 (tests/test_a.spec.ts)\n' > $A/docs/tests.md
 G score $A >/dev/null 2>&1;                            snap "⚙️ 완성도 1바퀴 < 90% → 가장 많이 깎은 bf로 자동" "-"
 row "점수 미달 → 담당 노드(bf)로 자동" "bf" "$(cur_of shop)"
-sed -i 's/| ✗ | 근거: - |/| ✓ | 근거: tests\/test_a.spec.ts:1 |/' $A/docs/checklist.md
+sedi 's/| ✗ | 근거: - |/| ✓ | 근거: tests\/test_a.spec.ts:1 |/' $A/docs/checklist.md
 gstop >/dev/null; G pass $A tr >/dev/null;              snap "bf 고침 → 자동 pass → tr → sc 다시" "-"
 G score $A >/dev/null 2>&1;                             snap "⚙️ 완성도 2바퀴 ≥ 90% → ★QA 보고 대기" "-"
 phase=post
@@ -168,7 +170,7 @@ out=""; for i in 1 2 3 4; do
   G pass apps/t1 req >/dev/null 2>&1; done
 row "★ 수정 지시 4번 → 거부 없음 + 3번째 '방식을 바꾸자' 안내" "000안내0" "$out"
 row "★에서 보낸 수정은 req 횟수에 안 셈" 0 "$(sed -n 's/.*"req": {"status": "[^"]*", "retries": \([0-9]*\).*/\1/p' "$(S t1)")"
-mkstate t2 cb 진행; sed -i -E 's/("bb": \{"status": "[^"]*", "retries": )0/\15/' "$(S t2)"
+mkstate t2 cb 진행; sedi -E 's/("bb": \{"status": "[^"]*", "retries": )0/\15/' "$(S t2)"
 row "AI 노드 횟수 초과(bb 되돌아옴 6번째) → 거부(4)" 4 "$(rc G fail apps/t2 cb "또 지적" bb)"
 row "→ cb 상태 = 사장보고" 사장보고 "$(st_of t2 cb)"
 mkstate t4 gm 진행
@@ -180,7 +182,7 @@ printf "test('x', () => {})\n" > apps/t5/tests/test_x.spec.ts
 G pass apps/t5 tc >/dev/null 2>&1
 row "ok-tl 승인 기록 없이 자동 잠금 → 거부(lock 사장보고, 잠금 파일 없음)" "사장보고 없음" "$(st_of t5 lock) $([ -f apps/t5/tests/.approved ] && echo 있음 || echo 없음)"
 # 서버 없는 앱: dd·ok-dd·bb·cb 건너뜀 → 합류 뒤 바로 bf
-mkstate t3 ok-ip 승인; sed -i 's/"ex_budget": ""/"ex_budget": "0"/' "$(S t3)"
+mkstate t3 ok-ip 승인; sedi 's/"ex_budget": ""/"ex_budget": "0"/' "$(S t3)"
 for n in ui dd ok-ui ok-dd bb cb bf; do setst t3 $n 대기; done
 echo '# 디자인' > apps/t3/docs/DESIGN.md; mkdir -p apps/t3/docs/mockups; echo png > apps/t3/docs/mockups/a.png
 G skip apps/t3 dd,ok-dd,bb,cb "서버 없음" >/dev/null; G pass apps/t3 ok-ip >/dev/null; G pass apps/t3 ui >/dev/null
@@ -188,7 +190,7 @@ G approve apps/t3 ok-ui OK >/dev/null; G pass apps/t3 ok-ui >/dev/null
 row "서버 없는 앱: 합류 뒤 바로 bf" "bf" "$(cur_of t3)"
 rm -rf apps/t1 apps/t2 apps/t3 apps/t4 apps/t5   # 아래 Stop 시험에 다른 앱이 끼지 않게
 # 자동 루프 브레이크
-mkstate t6 bf 진행; sed -i -E 's/("bf": \{"status": "[^"]*", "retries": [0-9]*, "boss_fixes": [0-9]*, "rounds": )0/\115/' "$(S t6)"
+mkstate t6 bf 진행; sedi -E 's/("bf": \{"status": "[^"]*", "retries": [0-9]*, "boss_fixes": [0-9]*, "rounds": )0/\115/' "$(S t6)"
 printf 'echo "FAILED x"; exit 1\n' > apps/t6/tests/run.sh
 row "자동 루프 15회 초과 → 사장 보고(22)" 22 "$(rc G loop apps/t6)"
 row "→ 다음 Stop은 정당한 멈춤(통과)" 0 "$(gstop true)"
@@ -220,15 +222,15 @@ row "25/28 = 89% → 가장 많이 깎은 담당(bb)으로" "89% bb" "$(sed -n '
 mkscore s3; cl s3 "19 20" ""
 G score apps/s3 >/dev/null 2>&1
 row "18/20 = 90% → ok-qa" "ok-qa" "$(cur_of s3)"
-mkscore s4; cl s4 "16 17 18 19 20" ""; sed -i 's/"rounds": 0, "history": ""/"rounds": 2, "history": "75,75"/' "$(S s4)"
+mkscore s4; cl s4 "16 17 18 19 20" ""; sedi 's/"rounds": 0, "history": ""/"rounds": 2, "history": "75,75"/' "$(S s4)"
 row "2바퀴 연속 정체 → 사장 보고(4)" "4 사장보고" "$(rc G score apps/s4) $(st_of s4 sc)"
-mkscore s5; cl s5 "" ""; sed -i 's#| 3 | ✓ | 근거: tests/test_a.spec.ts:1 |#| 3 | ✓ | 근거: src/없는파일.ts:9 |#' apps/s5/docs/checklist.md
+mkscore s5; cl s5 "" ""; sedi 's#| 3 | ✓ | 근거: tests/test_a.spec.ts:1 |#| 3 | ✓ | 근거: src/없는파일.ts:9 |#' apps/s5/docs/checklist.md
 G score apps/s5 >/dev/null 2>&1
 row "근거 없는 AI 항목(✓인데 파일 없음) → 미통과로 셈" "근거 없음" "$(grep -o '체크리스트 3 (근거 없음)' apps/s5/docs/score.md | sed 's/.*(\(.*\))/\1/')"
 rm -rf apps/s1 apps/s2 apps/s3 apps/s4 apps/s5
 
 # =============== D. ex 사용량, pub 비밀값, 깨진 state, migrate, lint ===============
-mkstate e1 ex 진행; sed -i 's/"ex_budget": ""/"ex_budget": "1000"/' "$(S e1)"
+mkstate e1 ex 진행; sedi 's/"ex_budget": ""/"ex_budget": "1000"/' "$(S e1)"
 G usage apps/e1 1500 >/dev/null
 row "ex 사용량 1.5배 → 계속" 진행 "$(st_of e1 ex)"
 G usage apps/e1 2500 >/dev/null
@@ -243,9 +245,9 @@ row "pub: 비밀값 없으면 통과 → dep" "0 dep" "$(rc G pass apps/p1 pub d
 mkstate b1 req 진행
 : > "$(S b1)"; row "깨진 state.json: 빈 파일 → 멈춤(3)" 3 "$(rc G status apps/b1)"
 printf '{\n  "version": 1,\n  oops\n' > "$(S b1)"; row "깨진 state.json: 형식 오류 → 멈춤(3)" 3 "$(rc G status apps/b1)"
-mkstate b2 req 진행; sed -i 's/^    "req": /    "nope": /' "$(S b2)"
+mkstate b2 req 진행; sedi 's/^    "req": /    "nope": /' "$(S b2)"
 row "깨진 state.json: 없는 노드 → 멈춤(3)" 3 "$(rc G status apps/b2)"
-mkstate b3 req 진행; sed -i 's/"status": "진행"/"status": "대충"/' "$(S b3)"
+mkstate b3 req 진행; sedi 's/"status": "진행"/"status": "대충"/' "$(S b3)"
 row "깨진 state.json: 모르는 상태 → 멈춤(3)" 3 "$(rc G status apps/b3)"
 mkdir -p apps/m1; printf '# m1\n현재 단계: 4 (구현)\n' > apps/m1/HANDOFF.md
 G migrate apps/m1 >/dev/null
@@ -312,11 +314,11 @@ rm -rf apps/e1 apps/p1 apps/b1 apps/b2 apps/b3 apps/m1
 
 # =============== G. 앞단계 문서 검사 (기획서·대조·안 정한 것) ===============
 mkstate q1 req 진행; mkreq apps/q1; echo x > apps/q1/docs/review_req.md
-sed -i 's/- 예산: 나중(첫 버전 뒤)/- 예산: 묻기/' apps/q1/docs/requirements.md
+sedi 's/- 예산: 나중(첫 버전 뒤)/- 예산: 묻기/' apps/q1/docs/requirements.md
 row "req: 빈칸 점검표에 '묻기' 남음 → 거부" "1 req" "$(rc G pass apps/q1 req) $(cur_of q1)"
-mkreq apps/q1; sed -i '/F1-1/d' apps/q1/docs/requirements.md
+mkreq apps/q1; sedi '/F1-1/d' apps/q1/docs/requirements.md
 row "req: 기능에 수용 기준 없음 → 거부" "1 req" "$(rc G pass apps/q1 req) $(cur_of q1)"
-mkreq apps/q1; sed -i '/성공 기준/,/^## 빈칸/{/^- /d}' apps/q1/docs/requirements.md
+mkreq apps/q1; sedi '/성공 기준/,/^## 빈칸/{/^- /d;}' apps/q1/docs/requirements.md
 row "req: 성공 기준 없음 → 거부" "1 req" "$(rc G pass apps/q1 req) $(cur_of q1)"
 mkreq apps/q1; rm apps/q1/docs/review_req.md
 row "req: Gemini 비판(review_req.md) 없음 → 거부" "1 req" "$(rc G pass apps/q1 req) $(cur_of q1)"
@@ -325,13 +327,13 @@ row "req: Gemini 지적은 있는데 Claude 판단이 빔 → 거부" "1 req" "$
 printf '## Gemini 지적\n- [높음] 성공 기준 — 모호함\n## Claude 판단\n- [맞음] 성공 기준 — 해결: docs/requirements.md:2\n' > apps/q1/docs/review_req.md
 row "req: 정상 → 통과(★기획 검토로)" "0 ok-req" "$(rc G pass apps/q1 req) $(cur_of q1)"
 mkstate q5 req 진행; echo x > apps/q5/docs/review_req.md
-mkreq apps/q5; sed -i 's/- F1 \[1차·꼭\] /- F1 /' apps/q5/docs/requirements.md
+mkreq apps/q5; sedi 's/- F1 \[1차·꼭\] /- F1 /' apps/q5/docs/requirements.md
 row "req: 기능에 [1차|나중·꼭|많을수록|놀람] 표시 없음 → 거부" "1 req" "$(rc G pass apps/q5 req) $(cur_of q5)"
-mkreq apps/q5; sed -i 's/ — 예: 사과 1개 → 장바구니 1//' apps/q5/docs/requirements.md
+mkreq apps/q5; sedi 's/ — 예: 사과 1개 → 장바구니 1//' apps/q5/docs/requirements.md
 row "req: 수용 기준에 예시(— 예:) 없음 → 거부" "1 req" "$(rc G pass apps/q5 req) $(cur_of q5)"
-mkreq apps/q5; sed -i '/^## 출시 안내문/,/^## 예상/{/^- /d}' apps/q5/docs/requirements.md
+mkreq apps/q5; sedi '/^## 출시 안내문/,/^## 예상/{/^- /d;}' apps/q5/docs/requirements.md
 row "req: 출시 안내문 없음 → 거부" "1 req" "$(rc G pass apps/q5 req) $(cur_of q5)"
-mkreq apps/q5; sed -i 's/\[1차·꼭\]/[나중·꼭]/' apps/q5/docs/requirements.md
+mkreq apps/q5; sedi 's/\[1차·꼭\]/[나중·꼭]/' apps/q5/docs/requirements.md
 row "req: 1차 기능이 하나도 없음 → 거부" "1 req" "$(rc G pass apps/q5 req) $(cur_of q5)"
 mkreq apps/q5
 row "req: 나중 기능(F2)은 수용 기준 없어도 → 통과" "0 ok-req" "$(rc G pass apps/q5 req) $(cur_of q5)"
@@ -412,7 +414,7 @@ printf '\n## 준비 코드 변경\n- tests/run.sh — 괜찮음: 실행만\n' >>
 row "→ 절은 있는데 tests/conftest.py 빠짐 → 거부" 1 "$(rc G pass apps/q1 qa)"
 printf -- '- tests/conftest.py — 괜찮음: import만\n' >> apps/q1/docs/review.md
 row "→ 바뀐 준비 코드를 모두 적음 → 통과(cx)" "0 cx" "$(rc G pass apps/q1 qa) $(cur_of q1)"
-back_to_qa() { sed -i -E 's/"current": \[[^]]*\]/"current": ["qa"]/; s/^(    "qa": \{"status": )"[^"]*"/\1"진행"/' "$(S q1)"; }
+back_to_qa() { sedi -E 's/"current": \[[^]]*\]/"current": ["qa"]/; s/^(    "qa": \{"status": )"[^"]*"/\1"진행"/' "$(S q1)"; }
 back_to_qa; printf '## Claude 판단\n- [틀림] 없음 — 이유: 확인함\n' > apps/q1/docs/review.md
 row "qa 다시: 지난 리뷰 뒤 준비 코드 안 바뀜 → 절 없어도 통과" "0 cx" "$(rc G pass apps/q1 qa) $(cur_of q1)"
 back_to_qa; echo '# 기다리는 시간 늘림' >> apps/q1/tests/run.sh
@@ -454,7 +456,7 @@ row "dep: 파일이 아닌 칸(공개 주소)은 확인 안 함 → 통과" 0 "$
 rm -rf apps/o1 apps/o2 apps/o3
 
 # F4. 건너뛰기 연쇄: 같은 이유("서버 없음"/"화면 없음")를 가진 노드를 함께 건너뜀
-mkk() { mkstate "$1" ok-ip 승인; sed -i 's/"ex_budget": ""/"ex_budget": "0"/' "$(S "$1")"
+mkk() { mkstate "$1" ok-ip 승인; sedi 's/"ex_budget": ""/"ex_budget": "0"/' "$(S "$1")"
   for n in ui dd ok-ui ok-dd bb cb bf ug; do setst "$1" $n 대기; done; }
 mkk k1; G skip apps/k1 bb "서버 없음" >/dev/null
 row "bb만 건너뛰기(서버 없음) → dd·ok-dd·cb도 건너뜀" "건너뜀 건너뜀 건너뜀" "$(st_of k1 dd) $(st_of k1 ok-dd) $(st_of k1 cb)"

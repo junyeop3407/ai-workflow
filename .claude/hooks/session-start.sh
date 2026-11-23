@@ -45,6 +45,38 @@ if [ -n "$apps" ]; then
   msg="$msg 세션 시작 점검: 진행 중인 앱($apps ) — git pull 뒤 test-runner로 각 앱 테스트를 한 번 돌려 깨진 것이 있으면 다른 일보다 먼저 사장에게 알리세요."
 fi
 
+# 1-2. 두 컴퓨터 동기화 (집 Windows ↔ 밖 Mac, 동시에는 안 씀 — 사장 2026-11-23)
+#      원격을 받아(fetch, 읽기만) 받을 것·안 올린 것·두 갈래·다른 컴퓨터의 임시 브랜치(wip/…)를 알린다. 고치지는 않는다.
+if [ "${SYNC_CHECK:-1}" = 1 ] && git remote get-url origin >/dev/null 2>&1; then
+  case "$(uname -s)" in Darwin) here=Mac ;; MINGW*|MSYS*|CYGWIN*) here=Windows ;; *) here="$(uname -s)" ;; esac
+  sync=""
+  if GIT_TERMINAL_PROMPT=0 git -c http.lowSpeedLimit=1000 -c http.lowSpeedTime=10 fetch --quiet origin </dev/null >/dev/null 2>&1; then
+    up="$(git rev-parse --abbrev-ref --symbolic-full-name '@{u}' 2>/dev/null)"
+    if [ -n "$up" ]; then
+      set -- $(git rev-list --left-right --count "$up...HEAD" 2>/dev/null); behind="${1:-0}"; ahead="${2:-0}"
+      if [ "$behind" -gt 0 ] && [ "$ahead" -gt 0 ]; then
+        sync="$sync 두 갈래가 생김(받을 커밋 ${behind}개 + 이 컴퓨터에만 있는 커밋 ${ahead}개): 다른 일을 하기 전에 사장에게 알리고 git pull 로 합치세요. 충돌이 나면 멈추고 쉬운 말로 알리세요."
+      elif [ "$behind" -gt 0 ]; then
+        sync="$sync 다른 컴퓨터에서 한 커밋 ${behind}개가 있음: 먼저 git pull."
+      elif [ "$ahead" -gt 0 ]; then
+        sync="$sync 이 컴퓨터에 아직 안 올린 커밋 ${ahead}개: 지난번 /handoff 를 빠뜨렸을 수 있음 — 사장에게 알리고 git push."
+      fi
+    fi
+    wips="$(git for-each-ref --format='%(refname:short)' refs/remotes/origin/wip/ 2>/dev/null | sed 's#^origin/##' | paste -sd, -)"
+    br="$(git symbolic-ref --quiet --short HEAD 2>/dev/null)"
+    [ -n "$wips" ] && case ",$wips," in
+      *",$br,"*) sync="$sync 지금 임시 브랜치 $br 에서 이어 하는 중(테스트가 다 통과하면 /handoff 로 main에 합침)." ;;
+      *) sync="$sync 원격에 다른 컴퓨터가 구현 중에 올린 임시 브랜치가 있음($wips): 그 앱을 이어 하려면 git switch <그 브랜치> 후 git pull." ;;
+    esac
+  else
+    sync="$sync 원격(GitHub)을 확인하지 못함(인터넷·로그인): 다른 컴퓨터 작업을 받았는지 모름 — 사장에게 알리세요."
+  fi
+  dirty="$(git status --porcelain 2>/dev/null | grep -c .)"
+  [ "$dirty" -gt 0 ] && sync="$sync 커밋 안 한 변경 ${dirty}개가 이 컴퓨터에 있음(지난번 이 컴퓨터에서 하던 것)."
+  lastpc="$(grep -m1 '^마지막 작업 컴퓨터:' HANDOFF.md 2>/dev/null | sed 's/^마지막 작업 컴퓨터:[[:space:]]*//')"
+  msg="$msg 두 컴퓨터 점검(지금: $here${lastpc:+, 지난번: $lastpc}):${sync:- 받을 것·안 올린 것 없음.}"
+fi
+
 # 2. 주간 회고
 to_epoch() { date -d "$1" +%s 2>/dev/null || date -j -f %Y-%m-%d "$1" +%s 2>/dev/null; }
 last="$(grep -Eom1 '[0-9]{4}-[0-9]{2}-[0-9]{2}' docs/last-weekly-review.txt 2>/dev/null)"

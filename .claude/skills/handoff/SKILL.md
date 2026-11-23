@@ -12,7 +12,7 @@ description: Use when a step of work is finished, before stopping a session, or 
 2. **레드팀 표시 확인**: `apps/<앱>/.redteam-needed`가 있으면 민감한 파일을 고친 뒤 레드팀을 아직 안 돌린 것이다. 중간 저장(작업 중 커밋)은 그대로 진행하되 앱 HANDOFF의 다음 할 일 맨 위에 "레드팀 다시 돌리기"를 적는다. 6단계 마무리·배포라면 먼저 `/build-app` "레드팀 공격"을 끝낸다. 표시 파일은 지우지 말고 함께 커밋한다.
 3. **앱 HANDOFF 갱신** (`apps/<앱>/HANDOFF.md`, 형식은 `/build-app` "HANDOFF 형식"): 현재 단계(graph.sh가 state.json에 맞춰 자동으로 적는다. 손으로 바꾸지 않는다), `apps/<앱>/state.json`도 함께 커밋, 결과(테스트 N/N 통과 + 날짜), 사용자에게 남은 질문, 다음 할 일. 구현 중이면 `docs/progress.md`(구현 일지)도 마지막 회차까지 적혀 있는지 확인한다.
    - **"완료"는 사장에게 "해결됐어요"를 받은 뒤에만** 쓴다(`/build-app` "사장 확인 루프"). 받기 전이면 "사장 확인 대기".
-4. **루트 HANDOFF 갱신** (`HANDOFF.md`): 앱을 끝냈을 때, 또는 중간에 멈출 때만. 로드맵 표와 "마지막 갱신" 날짜.
+4. **루트 HANDOFF 갱신** (`HANDOFF.md`): 앱을 끝냈을 때, 또는 중간에 멈출 때만. 로드맵 표와 "마지막 갱신" 날짜. **푸시할 때마다** 맨 위 `마지막 작업 컴퓨터: <Windows|Mac> <YYYY-MM-DD HH:MM> (<브랜치>)` 줄을 고친다(`uname -s`: Darwin = Mac, MINGW·MSYS = Windows). 다음 컴퓨터의 세션 시작 점검이 이 줄을 보여 준다.
 5. **커밋**: 한 커밋에 한 가지 일. 메시지는 한국어로 "무엇을, 왜" (예: `가계부: 월별 합계 추가 — 사장 요청`).
    - 커밋 메시지는 `git commit -m "..."` 한 줄로 쓴다(-F·heredoc은 승인 단어 검사에 막힐 수 있음).
    - git add / commit / pull / push / cd는 `&&` `;`로 잇지 말고 한 줄에 하나씩 실행한다(승인 단어가 든 명령에 붙이면 막힘).
@@ -25,3 +25,13 @@ description: Use when a step of work is finished, before stopping a session, or 
 ## 세션을 끝낼 때
 - 대화가 길어져 흐름을 놓칠 것 같으면 이 절차를 마치고 새 세션에서 "HANDOFF.md 읽고 이어서 해 줘"(앱은 "/build-app 이어서")를 하자고 제안한다.
 - 커밋 전 파일은 다른 컴퓨터로 따라가지 않는다. 옮기기 전에 이 절차를 끝낸다.
+
+## 다른 컴퓨터로 옮길 때 (집 Windows ↔ 밖 Mac, 사장 결정 2026-11-23)
+사장이 "나갈게", "마무리해 줘", "맥에서 할게"처럼 말하면 위 순서대로 하되, **테스트가 아직 실패하는 중**(구현 중)이면 main 대신 **임시 브랜치**로 올린다.
+1. 테스트가 통과하면 → 위 순서 그대로(main).
+2. 실패 중이면 → `git switch -c wip/<앱>`(이미 있으면 `git switch wip/<앱>`) → 위 3·4번(HANDOFF에 "임시 브랜치 wip/<앱>에서 구현 중, 실패 N개: …"를 다음 할 일 맨 위에) → `git add <앱 폴더>` → `git commit -m "<앱>: 구현 중 옮김(테스트 N/M) — 다른 컴퓨터에서 이어 하려고"` → `git push -u origin wip/<앱>`. 커밋 훅은 `wip/` 브랜치에서만 실패 상태 커밋을 허용한다. 승인된 테스트 잠금·비밀값 검사는 그대로 돈다.
+3. 사장에게: "임시 브랜치 wip/<앱>에 올렸어요. Mac에서 열면 세션 시작 점검이 알려 줍니다."
+- **이어 받을 때**(다른 컴퓨터): 세션 시작 점검이 원격의 `wip/…`를 알려 주면 `git switch wip/<앱>` → `git pull` → 이어서 구현.
+- **다시 main으로**(테스트가 다 통과하면): wip에서 커밋·푸시 → `git switch main` → `git pull` → `git merge --squash wip/<앱>` → `git commit -m "<앱>: <한 일> — 임시 브랜치 합침"`(이 커밋에서 테스트 확인) → `git push` → 로컬 `git branch -D wip/<앱>`. 그대로 합치기(`git merge wip/…`·cherry-pick·pull)와 `…:main` 푸시는 훅이 막는다.
+- **원격 임시 브랜치 지우기는 Claude가 못 한다**(브랜치 삭제는 훅이 막음, 안전 검사도 풀어 주지 않음). 합친 뒤 사장에게 이 한 줄을 붙여 넣어 달라고 한다: `! git push origin --delete wip/<앱>` — 안 지워도 문제는 없고, 세션 시작 점검에 계속 보일 뿐이다.
+- 한 앱에 임시 브랜치는 하나만. main에 합치기 전에 다른 앱 일을 시작하지 않는다(두 브랜치에 흩어지지 않게).

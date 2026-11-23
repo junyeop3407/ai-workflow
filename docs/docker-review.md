@@ -47,7 +47,7 @@ Docker는 **"모든 걸 컨테이너로"가 아니라, 직접 설치하면 아�
 | 메모리 | Docker가 몇 GB를 씀 → 상한을 정함(`.wslconfig`) | Docker Desktop 설정에서 상한 |
 | 라이선스 | 개인·소규모는 무료(조건은 설치 때 공식 안내 확인) | 같음 |
 
-**찾은 기존 문제(Mac)**: 시험 스크립트(`test-graph.sh`·`test-hooks.sh`)가 `sed -i`를 Windows Git Bash(GNU) 방식으로 써서 **Mac 기본 sed에서는 깨진다**. 실제 훅·graph.sh·lock.sh는 `sed -i`를 쓰지 않아 괜찮다. Mac에서 쓰려면 시험 스크립트를 고쳐야 한다(이번 일과 함께 하길 추천).
+**찾은 기존 문제(Mac)**: 시험 스크립트가 `sed -i`를 Windows(GNU) 방식으로 써서 Mac에서 깨지던 것은 고쳤다(2026-11-23, `sedi` 함수). Mac에서 실제로 돌려 확인하는 것은 Mac 준비 때(HANDOFF 3절 7번).
 
 ## 4. 보안 정책 (`dock.sh`가 실행 전에 검사, 하나라도 어기면 실행 안 함)
 가이드 9절을 그대로 강제한다.

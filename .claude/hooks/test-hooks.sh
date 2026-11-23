@@ -5,6 +5,8 @@
 #       bash .claude/hooks/test-hooks.sh --settings (+ settings.json 등록 확인)
 # 결과: 기대와 다른 줄이 하나라도 있으면 exit 1.
 
+# 제자리 고치기: GNU(Windows Git Bash)·BSD(Mac) sed 둘 다 되는 방식 — sed -i 대신
+sedi() { local f="${*: -1}"; sed -i.bak "$@" && rm -f "$f.bak"; }
 src="$(git rev-parse --show-toplevel)" || exit 1
 H="$src/.claude/hooks"
 tmp="$(mktemp -d)"
@@ -99,7 +101,7 @@ row "git add .approved > out.txt (리디렉션)" 막힘 "$(run "$(bash_json "git
 row "변경 없음: git commit" 통과 "$(run "$(bash_json "git commit -m x")" check-approved.sh commit)"
 row "변경 없음: Stop" 통과 "$(run "$(stop_json false)" check-approved.sh stop)"
 cp "$T" "$tmp/.bak"
-sed -i 's/== 3/== 4/' "$T"   # Bash sed -i 로 승인 테스트를 고침 (Edit 훅을 거치지 않음)
+sedi 's/== 3/== 4/' "$T"   # Bash sed -i 로 승인 테스트를 고침 (Edit 훅을 거치지 않음)
 row "Bash sed -i로 승인 테스트 수정 후 git commit" 막힘 "$(run "$(bash_json "git add -A && git commit -m x")" check-approved.sh commit)"
 row "같은 상태에서 Stop" 막힘 "$(run "$(stop_json false)" check-approved.sh stop)"
 row "같은 상태, Stop 두 번째(stop_hook_active)" 통과 "$(run "$(stop_json true)" check-approved.sh stop)"
@@ -111,7 +113,7 @@ cp "$tmp/.bak" "$T"
 rm "$T"
 row "승인 테스트를 rm 후 git commit" 막힘 "$(run "$(bash_json "git commit -am x")" check-approved.sh commit)"
 cp "$tmp/.bak" "$T"
-sed -i 's/$/\r/' "$T"         # 줄바꿈만 CRLF로 바뀜 (다른 컴퓨터)
+awk '{ printf "%s\r\n", $0 }' "$T" > "$T.crlf" && mv "$T.crlf" "$T"   # 줄바꿈만 CRLF로 바뀜 (다른 컴퓨터) — Mac sed는 \r을 못 써서 awk
 row "줄바꿈만 CRLF로 바뀜 → git commit" 통과 "$(run "$(bash_json "git commit -m x")" check-approved.sh commit)"
 cp "$tmp/.bak" "$T"
 
@@ -148,6 +150,20 @@ mkdir -p apps/demo2/tests
 printf '# demo2\n현재 단계: 4\n테스트 실행: `bash tests/run.sh`\n' > apps/demo2/HANDOFF.md
 printf 'exit 1\n' > apps/demo2/tests/run.sh
 row "(기존) check-tests: 테스트 실패 앱 commit" 막힘 "$(run "$(bash_json "git commit -m x")" check-tests.sh commit)"
+# ---- 두 컴퓨터: 임시 브랜치 wip/<앱> 에서만 실패 상태 커밋 허용, main으로 가는 뒷문은 막음 ----
+base_branch="$(git symbolic-ref --short HEAD)"
+git switch -q -c wip/demo2
+row "wip/demo2 브랜치: 테스트 실패 앱 commit → 허용(다른 컴퓨터로 옮기기)" 통과 "$(run "$(bash_json "git commit -m x")" check-tests.sh commit)"
+row "wip 브랜치에서 wip:main 으로 바로 push → 막힘" 막힘 "$(run "$(bash_json "git push origin wip/demo2:main")" guard-git.sh)"
+row "wip 브랜치에서 그냥 push → 통과" 통과 "$(run "$(bash_json "git push -u origin wip/demo2")" guard-git.sh)"
+git switch -q "$base_branch"
+row "main 브랜치: 테스트 실패 앱 commit → 그대로 막힘" 막힘 "$(run "$(bash_json "git commit -m x")" check-tests.sh commit)"
+row "main에서 git merge wip/demo2(그대로 합치기) → 막힘" 막힘 "$(run "$(bash_json "git merge wip/demo2")" guard-git.sh)"
+row "main에서 git merge --squash wip/demo2 → 통과(뒤의 commit에서 테스트)" 통과 "$(run "$(bash_json "git merge --squash wip/demo2")" guard-git.sh)"
+row "main에서 git cherry-pick wip/demo2 → 막힘" 막힘 "$(run "$(bash_json "git cherry-pick wip/demo2")" guard-git.sh)"
+row "main에서 git pull origin wip/demo2 → 막힘" 막힘 "$(run "$(bash_json "git pull origin wip/demo2")" guard-git.sh)"
+row "다 쓴 wip 원격 삭제(--delete) → 여전히 막힘(사장이 직접)" 막힘 "$(run "$(bash_json "git push origin --delete wip/demo2")" guard-git.sh)"
+git branch -q -D wip/demo2
 printf 'exit 0\n' > apps/demo2/tests/run.sh
 row "(기존) check-tests: 테스트 통과 앱 commit" 통과 "$(run "$(bash_json "git commit -m x")" check-tests.sh commit)"
 rm -rf apps/demo2
@@ -161,7 +177,7 @@ bash "$G" init apps/demo3 >/dev/null 2>&1
 cp apps/demo3/state.json "$tmp/.st3"
 at_node() { # 시험용: 현재 노드를 $1, 상태를 $2 로 바꾼 가짜 state.json
   cp "$tmp/.st3" apps/demo3/state.json
-  sed -i "s/\"current\": \[[^]]*\]/\"current\": [\"$1\"]/; s/\"req\": {\"status\": \"진행\"/\"req\": {\"status\": \"통과\"/; s/\"$1\": {\"status\": \"[^\"]*\"/\"$1\": {\"status\": \"$2\"/" apps/demo3/state.json
+  sedi "s/\"current\": \[[^]]*\]/\"current\": [\"$1\"]/; s/\"req\": {\"status\": \"진행\"/\"req\": {\"status\": \"통과\"/; s/\"$1\": {\"status\": \"[^\"]*\"/\"$1\": {\"status\": \"$2\"/" apps/demo3/state.json
 }
 printf 'exit 0\n' > apps/demo3/tests/backend.sh
 at_node bb 진행
@@ -272,6 +288,27 @@ row "주간 회고 오늘 함, startup" "안 물음" "$(run_out "$(ss startup)" 
 printf '# demo\n현재 단계: 4 (구현)\n테스트 실행: `bash tests/run.sh`\n' > apps/demo/HANDOFF.md
 row "진행 중인 앱 있음 → test-runner 점검 알림" "알림" "$(run_out "$(ss startup)" session-start.sh | grep -q 'demo' && echo 알림 || echo 없음)"
 
+# ---- 두 컴퓨터 동기화 점검 (집 Windows ↔ 밖 Mac): 가짜 GitHub(빈 저장소) + 두 복제본 ----
+sy="$tmp/.sync"; mkdir -p "$sy"; git init -q --bare "$sy/origin.git"
+cfg() { git -C "$1" config user.email t@example.com; git -C "$1" config user.name tester; }
+git clone -q "$sy/origin.git" "$sy/home" 2>/dev/null; cfg "$sy/home"
+printf '# H\n마지막 작업 컴퓨터: Mac 2026-11-23 08:00 (main)\n' > "$sy/home/HANDOFF.md"
+git -C "$sy/home" add -A; git -C "$sy/home" commit -qm a; git -C "$sy/home" push -q -u origin HEAD 2>/dev/null
+git clone -q "$sy/origin.git" "$sy/out" 2>/dev/null; cfg "$sy/out"
+syn() { (cd "$1" && printf '%s' "$(ss startup)" | bash "$H/session-start.sh" 2>/dev/null); }
+row "동기화: 받을 것·안 올린 것 없음 + 지난번 컴퓨터 표시" "없음 Mac" "$(o=$(syn "$sy/home"); printf '%s' "$o" | grep -q '받을 것·안 올린 것 없음' && printf 없음; printf '%s' "$o" | grep -q '지난번: Mac' && printf ' Mac')"
+echo x > "$sy/home/f"; git -C "$sy/home" add -A; git -C "$sy/home" commit -qm b
+row "동기화: 이 컴퓨터에 안 올린 커밋(푸시 잊음) → 알림" 알림 "$(syn "$sy/home" | grep -q '안 올린 커밋 1개' && echo 알림)"
+echo y > "$sy/out/g"; git -C "$sy/out" add -A; git -C "$sy/out" commit -qm c; git -C "$sy/out" push -q 2>/dev/null
+row "동기화: 다른 컴퓨터도 올림 → 두 갈래 경고" 경고 "$(syn "$sy/home" | grep -q '두 갈래' && echo 경고)"
+row "동기화: 다른 컴퓨터에서 올린 커밋만 있음 → 먼저 git pull" 받기 "$(git -C "$sy/home" reset -q --hard HEAD~1; syn "$sy/home" | grep -q '다른 컴퓨터에서 한 커밋 1개' && echo 받기)"
+git -C "$sy/out" switch -q -c wip/demo; echo z > "$sy/out/w"; git -C "$sy/out" add -A; git -C "$sy/out" commit -qm wip; git -C "$sy/out" push -q -u origin wip/demo 2>/dev/null
+row "동기화: 다른 컴퓨터가 구현 중 올린 임시 브랜치 → 알림" "wip/demo" "$(syn "$sy/home" | grep -o 'wip/demo' | head -n1)"
+echo dirty >> "$sy/home/HANDOFF.md"
+row "동기화: 커밋 안 한 변경 → 알림" 알림 "$(syn "$sy/home" | grep -q '커밋 안 한 변경 1개' && echo 알림)"
+git -C "$sy/home" remote set-url origin "$sy/없는곳.git"
+row "동기화: 원격 확인 실패(인터넷) → 알림" 알림 "$(syn "$sy/home" | grep -q '확인하지 못함' && echo 알림)"
+
 # ---- 그래프 훅 (graph-prompt.sh, graph-stop.sh, guard-state.sh, session-start 그래프 줄) ----
 G="$src/.claude/skills/build-app/graph.sh"
 gd="$(git rev-parse --git-dir)"
@@ -281,8 +318,8 @@ mkg() { # 앱 현재노드 상태 — 시험용 가짜 state
   rm -rf "apps/$1"; mkdir -p "apps/$1/src" "apps/$1/tests"
   printf '# %s\n현재 단계: 4\n테스트 실행: `bash tests/run.sh`\n' "$1" > "apps/$1/HANDOFF.md"; printf 'exit 0\n' > "apps/$1/tests/run.sh"
   bash "$G" init "apps/$1" >/dev/null 2>&1
-  sed -i -E '/^    "/ s/"status": "[^"]*"/"status": "통과"/; s/^(    "done": \{"status": )"통과"/\1"대기"/' "apps/$1/state.json"
-  sed -i -E "s/\"current\": \[[^]]*\]/\"current\": [\"$2\"]/; s/^(    \"$2\": \{\"status\": )\"[^\"]*\"/\1\"$3\"/" "apps/$1/state.json"
+  sedi -E '/^    "/ s/"status": "[^"]*"/"status": "통과"/; s/^(    "done": \{"status": )"통과"/\1"대기"/' "apps/$1/state.json"
+  sedi -E "s/\"current\": \[[^]]*\]/\"current\": [\"$2\"]/; s/^(    \"$2\": \{\"status\": )\"[^\"]*\"/\1\"$3\"/" "apps/$1/state.json"
 }
 mkg shop ok-req 사장대기
 row "SessionStart(startup): 진행 중 앱 → 그래프 줄" "있음" "$(run_out "$(ss startup)" session-start.sh | grep -q '그래프 shop' && echo 있음 || echo 없음)"

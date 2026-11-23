@@ -61,6 +61,13 @@ input="$(cat)"
 if [ "$mode" = "commit" ]; then
   # git commit 명령이 아니면 아무것도 하지 않는다
   printf '%s' "$input" | grep -q 'git commit' || exit 0
+  # 예외(사장 결정 2026-11-23): 임시 브랜치 wip/<앱> 에서만 테스트가 실패한 채로 커밋할 수 있다 —
+  # 구현 중에 다른 컴퓨터(집 Windows ↔ 밖 Mac)로 옮기려고. main 등 다른 브랜치는 그대로 막는다.
+  # wip를 main에 합칠 때는 guard-git.sh가 --squash를 요구해서, 합친 뒤의 git commit 에서 이 검사가 다시 돈다.
+  # 승인된 테스트 잠금 검사(check-approved.sh commit)는 wip에서도 그대로.
+  case "$(git symbolic-ref --quiet --short HEAD 2>/dev/null)" in
+    wip/*) exit 0 ;;
+  esac
 fi
 
 if [ "$mode" = "stop" ]; then

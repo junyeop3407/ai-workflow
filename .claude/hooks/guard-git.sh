@@ -60,7 +60,21 @@ if [ -n "$pushseg" ]; then
     && block "'+브랜치' 형태의 푸시는 강제 푸시와 같습니다."
   printf '%s' "$pushseg" | grep -Eq '(--delete|--mirror|[[:space:]]:[^[:space:]]+)' \
     && block "원격 브랜치 삭제·미러 푸시는 막혀 있습니다."
+  printf '%s' "$pushseg" | grep -Eq '[^[:space:]]:(refs/heads/)?(main|master)([[:space:]]|$)' \
+    && block "다른 브랜치를 main으로 바로 푸시(…:main)하면 테스트 확인을 건너뜁니다. main에서 합친 뒤 그냥 git push 하세요."
 fi
+# 임시 브랜치(wip/…)는 테스트가 실패해도 커밋되므로(check-tests 예외), 다른 브랜치로 가져올 때는
+# 한 커밋으로 묶어(--squash) 다시 커밋하게 한다 — 그 git commit 에서 check-tests가 테스트를 돌린다.
+cur_branch="$(git symbolic-ref --quiet --short HEAD 2>/dev/null)"
+case "$cur_branch" in
+  wip/*) ;;
+  *)
+    mergeseg="$(printf '%s' "$cmd" | grep -Eo 'git([[:space:]]+-[^[:space:]]+)*[[:space:]]+(merge|pull|rebase|cherry-pick)[^;&|]*')"
+    if printf '%s' "$mergeseg" | grep -q 'wip/'; then
+      printf '%s' "$mergeseg" | grep -Eq '[[:space:]]merge[[:space:]](.*[[:space:]])?--squash([[:space:]]|$)' \
+        || block "임시 브랜치(wip/…)를 그대로 합치면 테스트가 실패한 커밋이 ${cur_branch:-이 브랜치}에 들어옵니다. 'git merge --squash wip/<이름>' 뒤 'git commit -m \"…\"'로 합치세요(커밋 때 테스트 확인)."
+    fi ;;
+esac
 printf '%s' "$cmd" | grep -Eq 'git[[:space:]]+(filter-branch|filter-repo)\b' \
   && block "커밋 기록 고쳐 쓰기(filter-branch/filter-repo)는 막혀 있습니다."
 printf '%s' "$cmd" | grep -Eq 'gh[^;&|]*[[:space:]]repo[[:space:]]+(delete|archive)\b' \
