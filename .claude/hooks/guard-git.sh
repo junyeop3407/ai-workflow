@@ -71,7 +71,7 @@ if [ -n "$pushseg" ]; then
       done ;;
   esac
 fi
-printf '%s' "$cmd" | grep -Eq '(^|[[:space:]])--no-verify([[:space:]]|$)|core\.hooks[Pp]ath' \
+printf '%s' "$cmd" | grep -Eiq '(^|[[:space:]])--no-v[a-z-]*([[:space:]=]|$)|core\.hookspath' \
   && block "git 훅을 건너뛰거나(--no-verify) 훅 경로(core.hooksPath)를 바꾸면 main push 전 테스트 확인(.githooks/pre-push)이 꺼집니다."
 printf '%s' "$cmd" | grep -Eq 'push\.default|remote\.[^[:space:]]*\.push|branch\.[^[:space:]]*\.merge' \
   && block "푸시·추적 설정(push.default·remote.*.push·branch.*.merge)을 바꾸면 임시 브랜치가 main으로 갈 수 있습니다. 설정은 그대로 두세요."

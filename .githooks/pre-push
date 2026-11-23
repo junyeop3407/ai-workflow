@@ -22,18 +22,29 @@ while read -r lref lsha rref rsha; do
     echo "[pre-push] $rref 로는 지금 체크아웃한 커밋만 올릴 수 있습니다(테스트를 돌려 확인하려고). 'git switch main' 뒤 'git push'." >&2
     fail=1; continue
   fi
-  if [ -n "$(git status --porcelain --untracked-files=no)" ]; then
-    echo "[pre-push] 커밋 안 한 변경이 있어 테스트 결과가 올릴 커밋과 다를 수 있습니다. 커밋하거나 되돌린 뒤 다시 push." >&2
+  # 커밋 안 한 변경 + apps/ 안의 새 파일(.gitignore 된 것 빼고)도 있으면 거부 — 테스트가 그 파일을 집어 갈 수 있어서
+  if [ -n "$(git status --porcelain --untracked-files=no)" ] || [ -n "$(git status --porcelain --untracked-files=all -- apps)" ]; then
+    echo "[pre-push] 커밋 안 한 변경이나 apps/ 안 새 파일이 있어 테스트 결과가 올릴 커밋과 다를 수 있습니다. 커밋하거나 치운 뒤 다시 push." >&2
     fail=1; continue
   fi
   if [ "$rsha" = "$z40" ] || ! git cat-file -e "$rsha" 2>/dev/null; then
-    apps="$(ls -d apps/*/ 2>/dev/null | cut -d/ -f2)"
+    apps="$(git -c core.quotePath=false ls-tree -d --name-only "$lsha" apps/ 2>/dev/null | cut -d/ -f2)"
+    changed="$(git -c core.quotePath=false ls-tree -r --name-only "$lsha" -- apps)"
   else
-    apps="$(git diff --name-only "$rsha" "$lsha" -- apps | cut -d/ -f2 | sort -u)"
+    changed="$(git -c core.quotePath=false diff --name-only "$rsha" "$lsha" -- apps)"
+    apps="$(printf '%s\n' "$changed" | cut -d/ -f2 | sort -u)"
   fi
-  for app in $apps; do
+  while IFS= read -r app; do
+    [ -n "$app" ] || continue
     h="apps/$app/HANDOFF.md"
-    [ -f "$h" ] && grep -q '테스트 실행:' "$h" || continue
+    if ! { [ -f "$h" ] && grep -q '테스트 실행:' "$h"; }; then
+      # 테스트 줄이 없어도 되는 것: 아직 테스트 전 단계(문서·HANDOFF·state.json만 바뀜). 코드가 바뀌었는데 줄이 없으면 거부(모르면 막기)
+      if printf '%s\n' "$changed" | grep "^apps/$app/" | grep -Ev "^apps/$app/(docs/|HANDOFF\.md$|state\.json$)" | grep -q .; then
+        echo "[pre-push] apps/$app 코드가 바뀌었는데 HANDOFF에 '테스트 실행:' 줄이 없어 테스트를 확인할 수 없습니다 — main에 올리지 않습니다." >&2
+        fail=1
+      fi
+      continue
+    fi
     key=""
     if [ -f "apps/$app/state.json" ] && [ -f "$G" ] && bash "$G" current "apps/$app" --status </dev/null 2>/dev/null | grep -Eq '^(bb|cb):' && grep -q '백엔드 테스트:' "$h"; then
       key="백엔드"
@@ -43,7 +54,7 @@ while read -r lref lsha rref rsha; do
       printf '%s\n' "$out" | tail -n 20 >&2
       fail=1
     fi
-  done
+  done <<< "$apps"
 done
 
 exit $fail

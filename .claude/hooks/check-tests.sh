@@ -70,7 +70,8 @@ if [ "$mode" = "commit" ]; then
   # 브랜치를 바꾸는 명령(switch·checkout·reset·update-ref·symbolic-ref·branch·worktree·-C)이 섞이면 예외를 주지 않는다.
   #   더 좁게: 명령 전체가 정확히 `git commit [-a] [-q] -m "<메시지>" [-m "<메시지>"]` 꼴일 때만(앞에 환경 변수·git 전역 옵션
   #   --git-dir·--work-tree·-c 등이 붙으면 다른 저장소를 가리킬 수 있어 예외 없음). 마지막 방어선은 .githooks/pre-push.
-  wcmd="$(printf '%s' "$input" | tr '\n' ' ' | sed -n 's/.*"command"[[:space:]]*:[[:space:]]*"//p' | sed 's/\\"/"/g; s/"[[:space:]]*,[[:space:]]*"[a-z_]*"[[:space:]]*:.*//; s/"[[:space:]]*}[}[:space:]]*$//')"
+  # JSON 문자열 값을 "이스케이프를 지킨 채" 끝 따옴표까지만 꺼낸 뒤 푼다 — 값 안에 ","x": 를 끼워 넣어 뒷부분을 잘라 내는 속임수 차단
+  wcmd="$(printf '%s' "$input" | tr '\n' ' ' | sed -nE 's/.*"command"[[:space:]]*:[[:space:]]*"(([^"\\]|\\.)*)".*/\1/p' | sed 's/\\"/"/g; s/\\n/ ; /g')"   # (역슬래시가 남으면 아래 꼴 검사에서 예외 없음)
   if printf '%s' "$wcmd" | grep -Eq '^[[:space:]]*git[[:space:]]+commit([[:space:]]+(-a|-q|-m[[:space:]]+("[^"`$\\;&|]*"|[^[:space:]"'"'"'`$\\;&|-][^[:space:]"'"'"'`$\\;&|]*)))+[[:space:]]*$' \
      && ! printf '%s' "$wcmd" | grep -Eq '[;&|`]|\$\(|(^|[[:space:]])(switch|checkout|reset|update-ref|symbolic-ref|branch|worktree)([[:space:]]|$)'; then
     case "$(git symbolic-ref --quiet --short HEAD 2>/dev/null)" in

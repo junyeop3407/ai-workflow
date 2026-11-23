@@ -168,6 +168,9 @@ row "git -c … push --force(옵션 끼워 넣기) → 막힘" 막힘 "$(run "$(
 row "git push --no-verify(git 훅 건너뛰기) → 막힘" 막힘 "$(run "$(bash_json "git push --no-verify")" guard-git.sh)"
 row "git -c core.hooksPath=… (훅 경로 바꾸기) → 막힘" 막힘 "$(run "$(bash_json "git -c core.hooksPath=/dev/null push")" guard-git.sh)"
 row "wip: git --git-dir=… commit(다른 저장소 가리키기) → 예외 없음(막힘)" 막힘 "$(run "$(bash_json "git --git-dir=../o commit -m x")" check-tests.sh commit)"
+row "wip: 메시지에 JSON 구분자 끼워 뒤 명령 숨기기 → 예외 없음(막힘)" 막힘 "$(run '{"session_id":"t","tool_name":"Bash","tool_input":{"command":"git commit -m x\",\"a\":\"; git switch main && git commit -m y","description":"x"}}' check-tests.sh commit)"
+row "git push --no-ver(줄인 옵션) → 막힘" 막힘 "$(run "$(bash_json "git push --no-ver")" guard-git.sh)"
+row "git -c CORE.HOOKSPATH=…(대문자) → 막힘" 막힘 "$(run "$(bash_json "git -c CORE.HOOKSPATH=x push")" guard-git.sh)"
 row "wip: GIT_DIR=… git commit → 예외 없음(막힘)" 막힘 "$(run "$(bash_json "GIT_DIR=x git commit -m x")" check-tests.sh commit)"
 row "따옴표 섞은 merge 'wip/demo2' → 막힘" 막힘 "$(run "$(bash_json "git merge 'wip/demo2'")" guard-git.sh)"
 git branch -q main "$base_branch" 2>/dev/null   # (시험 저장소 기본 브랜치가 master일 때 main을 만들어 둠)
@@ -343,7 +346,15 @@ row "pre-push: 임시 브랜치에서 wip/px:main 으로 push(글자 훅을 거�
 git -C "$pp" switch -q main; printf 'echo "  1 passed"; exit 0\n' > "$pp/apps/px/tests/run.sh"
 row "pre-push: 커밋 안 한 변경이 있으면 → 거부" 거부 "$(git -C "$pp" push -q origin main >/dev/null 2>&1 && echo 올라감 || echo 거부)"
 git -C "$pp" add -A; git -C "$pp" commit -qm "고침"
+echo 'test("x")' > "$pp/apps/px/extra.spec.js"
+row "pre-push: apps/ 안에 커밋 안 된 새 파일 → 거부" 거부 "$(git -C "$pp" push -q origin main >/dev/null 2>&1 && echo 올라감 || echo 거부)"
+rm -f "$pp/apps/px/extra.spec.js"
 row "pre-push: 테스트 통과 커밋을 main으로 → 올라감" 올라감 "$(git -C "$pp" push -q origin main >/dev/null 2>&1 && echo 올라감 || echo 거부)"
+mkdir -p "$pp/apps/py/docs" "$pp/apps/py/src"; printf '# py\n현재 단계: 1\n' > "$pp/apps/py/HANDOFF.md"; echo '# 기획' > "$pp/apps/py/docs/requirements.md"
+git -C "$pp" add -A; git -C "$pp" commit -qm "기획만"
+row "pre-push: 테스트 줄 없는 앱이지만 문서만 바뀜 → 올라감" 올라감 "$(git -C "$pp" push -q origin main >/dev/null 2>&1 && echo 올라감 || echo 거부)"
+echo 'x' > "$pp/apps/py/src/a.js"; git -C "$pp" add -A; git -C "$pp" commit -qm "코드"
+row "pre-push: 테스트 줄 없는 앱인데 코드가 바뀜 → 거부(모르면 막기)" 거부 "$(git -C "$pp" push -q origin main >/dev/null 2>&1 && echo 올라감 || echo 거부)"
 row "pre-push: 다른 브랜치 커밋을 체크아웃 없이 main으로 → 거부" 거부 "$(git -C "$pp" push -q origin wip/px:main >/dev/null 2>&1 && echo 올라감 || echo 거부)"
 
 # ---- 그래프 훅 (graph-prompt.sh, graph-stop.sh, guard-state.sh, session-start 그래프 줄) ----
