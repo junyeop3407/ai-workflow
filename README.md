@@ -16,7 +16,7 @@ Claude Code가 혼자 돌려서 앱을 만드는 작업장 견본입니다.
 | `.claude/rules/` | 보안·백엔드 설계(SOLID)·화면(웹+안드로이드·iOS)·테스트 규칙 | 파일 위에 경로를 적어 그 경로를 열 때만 불러짐 |
 | `.claude/skills/` | `/build-app`(앱 흐름 그래프 `graph.md` + 순서를 지키는 `graph.sh` + 단계별 스킬 표 + 자동 구현 루프), `/handoff`(HANDOFF → 커밋 → 푸시), `/weekly-review`(반복된 실수 → 규칙 후보 최대 3개) | 평소엔 설명 한 줄만, 쓸 때만 본문을 읽음 |
 | `.claude/hooks/` | 실패 상태 커밋·강제 푸시·비밀값 커밋 차단, 승인된 테스트 잠금(사장만 잠금, 수정 시 확인 창, 어떤 방법으로 바꿔도 커밋 직전·응답 끝에 해시로 잡음), 민감한 파일 수정 시 레드팀 다시 돌리기 표시, 세션 시작 점검·주간 회고 알림. 시험: `bash .claude/hooks/test-hooks.sh --settings` | Claude가 뭘 판단하든 동작 자체를 막음 |
-| `.claude/agents/` | 개발팀 `backend-dev`·`frontend-dev`(실제로 코드를 짬, 자기 팀 파일만 — `team-files.sh` 훅, 조직은 [docs/org.md](docs/org.md)), QA팀 `test-runner`·`qa-reviewer`, 보안 검증팀 `red-team`, 법무팀 `legal`(외부 자료·개인정보·라이선스 GREEN/YELLOW/RED, `docs/legal.md`만) (qa-reviewer·red-team은 자주 나오는 문제를 `.claude/agent-memory/`에 쌓음 — 공개 저장소라 일반 패턴만, 앱별 증거·키는 안 적음) | 자기 컨텍스트에서 일하고 요약만 돌려줘 메인 대화가 가벼움 |
+| `.claude/agents/` | 개발팀 `backend-dev`·`frontend-dev`(실제로 코드를 짬, 자기 팀 파일만 — `team-files.sh` 훅, 조직은 [docs/org.md](docs/org.md)), QA팀 `test-runner`·`qa-reviewer`, 보안 검증팀 `red-team`, 법무팀 `legal`(외부 자료·개인정보·라이선스 GREEN/YELLOW/RED, `docs/legal.md`만), 경영팀 `manager`(요구사항 변경 영향·막힘·잠금 지연, `docs/ops.md`만) (qa-reviewer·red-team은 자주 나오는 문제를 `.claude/agent-memory/`에 쌓음 — 공개 저장소라 일반 패턴만, 앱별 증거·키는 안 적음) | 자기 컨텍스트에서 일하고 요약만 돌려줘 메인 대화가 가벼움 |
 
 - `/build-app` 순서는 그래프(`graph.md`)가 정하고 자동으로 흐름: 질문 → 설계안 3개 → 테스트 목록 승인(첫 잠금 자동) → 계획 → 백엔드 → 프론트(Stop 훅 자동 루프, 일지 `progress.md`, 15회·같은 실패 3회면 멈춤) → 별도 리뷰 + **교차 리뷰**(Codex·Gemini, 필수) → 레드팀 → 완성도 90% → 확인("해결됐어요 / 아직이에요")·올리기. 사장은 ★에서 보기만 누름
 - 예약 작업은 쓰지 않습니다. 세션을 열 때 진행 중인 앱 테스트를 한 번 돌리고, 7일이 지났으면 주간 회고를 한 번 묻습니다.

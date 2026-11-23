@@ -434,6 +434,18 @@ legal_ok() { # lg: 법무 판정서 형식 + 기획서의 외부 자료가 모�
   done < <(sec_lines "$APPDIR/docs/requirements.md" "외부 자료·데이터" | sed 's/^[[:space:]]*- //; s/ — .*//' | grep -v '^없음')
   [ -z "$bad" ] && return 0; LEGAL_MSG="법무 판정서(docs/legal.md) 검사 실패:$bad"; return 1
 }
+ops_ok() { # 출발 보낼곳: 경영팀 영향 분석(docs/ops.md) + 출발 ★의 사장 승인 기록
+  local o="$APPDIR/docs/ops.md" s k bad=""
+  s="$(sec_lines "$o" "영향 분석: $1 → $2")"
+  if [ -z "$s" ]; then bad="$bad docs/ops.md에 '## 영향 분석: $1 → $2' 절이 없음;"
+  else
+    for k in "영향" "다시 돌 노드" "추천"; do
+      printf '%s\n' "$s" | grep -Eq "^[[:space:]]*- $k:[[:space:]]*[^[:space:]]" || bad="$bad 영향 분석에 '- $k:' 줄이 없거나 빔;"
+    done
+  fi
+  [ "$(nf "$1" 3)" = "사람" ] && ! has_approval "$1" && bad="$bad $1 사장 승인 기록 없음(graph.sh approve);"
+  [ -z "$bad" ] && return 0; OPS_MSG="$bad"; return 1
+}
 redteam_ok() { [ ! -f "$APPDIR/.redteam-needed" ] && [ -f "$APPDIR/docs/redteam.md" ]; }
 secrets_ok() { SECRET_OUT="$(bash "$HOOKS/guard-git.sh" scan "$APPDIR" </dev/null 2>&1)"; }
 run_check() { # 노드의 ⚙️ 검사. 실패면 CHECK_MSG 와 함께 1
@@ -608,6 +620,11 @@ cmd_fail() {
   for t in $(opts "$targets"); do
     in_list "$t" "$allowed" || die 1 "[그래프 $APP] 표에 없는 실패 엣지: $id → $t (가능: $allowed). 사장에게 보기 + 추천으로 묻거나 docs/ask-later.md에 적으세요."
     [ "$(st "$t")" = "건너뜀" ] && die 1 "[그래프 $APP] $t 는 건너뛴 노드입니다(이 앱에 없음)."
+    # '먼저 묻기: 사장' 엣지 = 요구사항을 바꾸는 길 → 경영팀 영향 분석 + 사장 승인 기록이 있어야
+    if [ "$(awk -F'\t' -v f="$id" -v t="$t" '$1==f && $2==t { print $4; exit }' "$FP")" = "사장" ]; then
+      ops_ok "$id" "$t" || die 1 "[그래프 $APP] $id → $t 는 요구사항을 바꾸는 길이라 먼저 확인이 필요합니다:$OPS_MSG
+순서: ① manager 에이전트에게 영향 분석을 맡김(docs/ops.md '## 영향 분석: $id → $t') ② 분석을 붙여 사장에게 묻기 ③ graph.sh approve $APPDIR $id \"<사장 답>\" ④ 다시 fail"
+    fi
   done
   # bb 먼저, 그다음 bf … (graph.md 순서)
   targets="$(for t in $(opts "$targets"); do printf '%s %s\n' "$(order_of "$t")" "$t"; done | sort -n | awk '{ print $2 }' | paste -sd, -)"

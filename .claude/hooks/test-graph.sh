@@ -292,7 +292,18 @@ row "lg: '법률 자문이 아님' 문구 없음 → 거부" "1 lg" "$(rc G pass
 printf "$lgok"'- [RED] 향수 목록 — 쓰는 방식: 화면 표시 — 근거: 약관 2조 (2026-11-23) — 조치: 대체: 공식 API\n' > apps/l1/docs/legal.md
 row "lg: RED + 조치 있음 → 통과(★법무 검토에서 사장이 고름)" "0 ok-lg" "$(rc G pass apps/l1 lg) $(cur_of l1)"
 G approve apps/l1 ok-lg "대체 자료 찾기" >/dev/null
-row "ok-lg: 대체 자료 → 기획(req)으로 되돌림" "0 req" "$(rc G fail apps/l1 ok-lg "대체 자료 찾기" req) $(cur_of l1)"
+row "ok-lg → req(요구사항 변경): 경영팀 영향 분석 없음 → 거부" "1 ok-lg" "$(rc G fail apps/l1 ok-lg "대체 자료 찾기" req) $(cur_of l1)"
+printf '# 운영 기록\n## 영향 분석: ok-lg → req (2026-11-23)\n- 영향: 기획서 외부 자료 바뀜\n- 다시 돌 노드: req → ok-req → lg → ok-lg\n' > apps/l1/docs/ops.md
+row "영향 분석에 '- 추천:' 줄 없음 → 거부" 1 "$(rc G fail apps/l1 ok-lg "대체 자료 찾기" req)"
+printf -- '- 추천: 지금 바꾸기 — 공식 API로 대체\n' >> apps/l1/docs/ops.md
+row "ok-lg: 영향 분석 + 승인 기록 → 기획(req)으로 되돌림" "0 req" "$(rc G fail apps/l1 ok-lg "대체 자료 찾기" req) $(cur_of l1)"
+mkstate m3 ok-qa 사장대기
+printf '# 운영 기록\n## 영향 분석: ok-qa → tl (2026-11-23)\n- 영향: 테스트 목록 F3-1 추가\n- 다시 돌 노드: tl → ok-tl → tc → lock\n- 추천: 지금 바꾸기\n' > apps/m3/docs/ops.md
+row "ok-qa → tl(요구사항 변경): 영향 분석은 있는데 사장 승인 없음 → 거부" 1 "$(rc G fail apps/m3 ok-qa "결제 내역 내보내기도 필요" tl)"
+G approve apps/m3 ok-qa "테스트 목록에 추가해서 진행" >/dev/null
+row "ok-qa → tl: 영향 분석 + 승인 → 통과" "0 tl" "$(rc G fail apps/m3 ok-qa "결제 내역 내보내기도 필요" tl) $(cur_of m3)"
+mkstate m4 ok-qa 사장대기
+row "ok-qa → bf(아직이에요)는 요구사항 변경이 아니라 분석 없이 통과" "0 bf" "$(rc G fail apps/m4 ok-qa "버튼이 아직 안 보여요" bf) $(cur_of m4)"
 mkstate l2 lg 진행; setst l2 ok-lg 대기; setst l2 opt 대기; G skip apps/l2 lg "법무 해당 없음" >/dev/null
 row "lg 건너뛰기 → ok-lg도 함께 건너뛰고 설계안(opt)으로" "건너뜀 건너뜀 opt" "$(st_of l2 lg) $(st_of l2 ok-lg) $(cur_of l2)"
 sed 's#| docs/data.md, docs/api.md |#| docs/data.md, docs/DESIGN.md |#' "$src/.claude/skills/build-app/graph.md" > "$tmp/bad.md"

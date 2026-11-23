@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
-# 팀 에이전트 파일 경계 (docs/org.md). backend-dev는 서버 파일만, frontend-dev는 화면 파일만, legal은 docs/legal.md만 고친다.
+# 팀 에이전트 파일 경계 (docs/org.md). backend-dev는 서버 파일만, frontend-dev는 화면 파일만, legal은 docs/legal.md만, manager는 docs/ops.md만 고친다.
 # 목록에 없는 파일은 **아무 팀도 못 고침(기본 거부)** — 테스트·문서·설정·state.json·HANDOFF·패키지 설정은 통합(메인)·QA·사장 몫.
 # jq 없이 동작한다.
 #
 #   team-files.sh <에이전트>               : PreToolUse(Edit|Write|MultiEdit|NotebookEdit) — 에이전트 파일 frontmatter에서
-#   team-files.sh                          : settings.json에서 — 입력의 agent_type이 backend-dev·frontend-dev·legal일 때만 검사
+#   team-files.sh                          : settings.json에서 — 입력의 agent_type이 backend-dev·frontend-dev·legal·manager일 때만 검사
 #   team-files.sh mark                     : 메인이 에이전트에게 맡기기 **직전** — 저장소 전체 상태를 찍어 기준 표(<트리>:<목록>)를 출력.
 #                                            표는 git 객체 해시(내용이 바뀌면 해시도 바뀜)라 에이전트가 고쳐 쓸 수 없다. 메인이 들고 있는다
 #   team-files.sh check <앱폴더> <에이전트> <기준 표>
@@ -23,6 +23,7 @@ owner_of() {
   case "$p" in
     # 법무팀 판정서는 법무팀만
     docs/legal.md) echo legal ;;
+    docs/ops.md) echo manager ;;   # 경영팀 운영 기록은 경영팀만
     # 둘 다 못 고침 — 테스트 파일은 어디에 있어도 QA팀
     *.test.*|*.spec.*|*/__tests__/*|__tests__/*|src/test/*) echo locked ;;
     # 백엔드
@@ -43,6 +44,7 @@ team_of() {
     backend-dev) echo backend ;;
     frontend-dev) echo frontend ;;
     legal) echo legal ;;
+    manager) echo manager ;;
     *) echo "" ;;
   esac
 }

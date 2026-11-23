@@ -254,6 +254,10 @@ row "메인 대화(agent_type 없음)가 서버 코드 Write" 통과 "$(run "$(w
 row "legal이 docs/legal.md Write" 통과 "$(run "$(agent_write_json legal "$tmp/apps/demo/docs/legal.md")" team-files.sh)"
 row "legal이 기획서(docs/requirements.md) Write" 막힘 "$(run "$(agent_write_json legal "$tmp/apps/demo/docs/requirements.md")" team-files.sh)"
 row "legal이 화면 코드 Write" 막힘 "$(run "$(agent_write_json legal "$tmp/apps/demo/src/App.tsx")" team-files.sh)"
+row "manager가 docs/ops.md Write" 통과 "$(run "$(agent_write_json manager "$tmp/apps/demo/docs/ops.md")" team-files.sh)"
+row "manager가 기획서 Write (기획팀 몫)" 막힘 "$(run "$(agent_write_json manager "$tmp/apps/demo/docs/requirements.md")" team-files.sh)"
+row "manager가 state.json Write (순서 직접 바꾸기)" 막힘 "$(run "$(agent_write_json manager "$tmp/apps/demo/state.json")" team-files.sh)"
+row "manager가 docs/legal.md Write (법무 결과 변경)" 막힘 "$(run "$(agent_write_json manager "$tmp/apps/demo/docs/legal.md")" team-files.sh)"
 row "frontend-dev가 docs/legal.md Write (법무 결과 변경)" 막힘 "$(run "$(agent_write_json frontend-dev "$tmp/apps/demo/docs/legal.md")" team-files.sh)"
 row "다른 에이전트(qa-reviewer)는 이 훅이 관여 안 함" 통과 "$(run "$(agent_write_json qa-reviewer "$tmp/apps/demo/src/App.tsx")" team-files.sh)"
 
@@ -365,6 +369,9 @@ if [ "$1" = "--settings" ]; then
   f="$src/.claude/agents/legal.md"; r="없음"
   grep -q 'team-files.sh" legal' "$f" && ! grep -q '^tools:.*Bash' "$f" && r="등록됨"
   row "등록: legal 에이전트 파일 경계 훅 + Bash 없음" 등록됨 "$r"
+  f="$src/.claude/agents/manager.md"; r="없음"
+  grep -q 'team-files.sh" manager' "$f" && ! grep -q '^tools:.*Bash' "$f" && r="등록됨"
+  row "등록: manager 에이전트 파일 경계 훅 + Bash 없음" 등록됨 "$r"
 fi
 
 echo "| 경우 | 기대 | 실제 | |"
