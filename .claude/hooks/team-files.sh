@@ -1,28 +1,35 @@
 #!/usr/bin/env bash
 # 개발팀 서브에이전트 파일 경계 (docs/org.md "개발팀"). backend-dev는 서버 파일만, frontend-dev는 화면 파일만 고친다.
-# 둘 다 테스트·문서·state.json·HANDOFF는 못 고친다(QA팀·기획·사장 승인 영역). jq 없이 동작한다.
+# 목록에 없는 파일은 **아무 팀도 못 고침(기본 거부)** — 테스트·문서·설정·state.json·HANDOFF·패키지 설정은 통합(메인)·QA·사장 몫.
+# jq 없이 동작한다.
 #
-#   team-files.sh <에이전트>              : PreToolUse(Edit|Write|MultiEdit|NotebookEdit) — 에이전트 파일 frontmatter에서
-#   team-files.sh                         : settings.json에서 — 입력의 agent_type이 backend-dev·frontend-dev일 때만 검사
-#   team-files.sh check <앱폴더> <에이전트> [기준커밋]
-#                                         : 메인 대화가 에이전트 결과를 받은 뒤 — Bash로 고친 것까지 포함해
-#                                           바뀐·생긴 파일이 그 팀 소유인지 확인(어긋나면 exit 1)
-#   team-files.sh owner <앱 폴더 기준 경로> : 그 파일 담당(backend|frontend|locked) 한 단어
+#   team-files.sh <에이전트>               : PreToolUse(Edit|Write|MultiEdit|NotebookEdit) — 에이전트 파일 frontmatter에서
+#   team-files.sh                          : settings.json에서 — 입력의 agent_type이 backend-dev·frontend-dev일 때만 검사
+#   team-files.sh mark                     : 메인이 에이전트에게 맡기기 **직전** — 저장소 전체 상태를 기준점으로 찍음
+#   team-files.sh check <앱폴더> <에이전트>  : 에이전트 답을 받은 **직후**(메인이 아무것도 쓰기 전) — 기준점 뒤에 바뀐 것이
+#                                            Bash로 고친 것까지 모두 그 팀 파일인지 저장소 전체에서 확인(어긋나면 exit 1)
+#   team-files.sh owner <앱 폴더 기준 경로>  : 그 파일 담당(backend|frontend|locked) 한 단어
 
-# 앱 폴더 기준 경로 → backend | frontend | locked
+# 앱 폴더 기준 경로 → backend | frontend | locked  (대소문자 무시: Windows·Mac 파일 시스템)
 owner_of() {
-  local p="$1"
-  case "$p" in
-    *..*|"") echo locked; return ;;
+  local p
+  p="$(printf '%s' "$1" | tr 'A-Z' 'a-z')"
+  case "/$p/" in
+    *//*|*/./*|*/../*) echo locked; return ;;   # 빈 조각·. ·.. 이 든 경로는 판단하지 않고 거부
   esac
   case "$p" in
-    tests/*|docs/*|samples/*|state.json|HANDOFF.md|deploy.sh|.redteam-needed|*.approved*) echo locked ;;
-    src/test/*) echo locked ;;   # JUnit·구조 검사(ArchitectureTest)는 QA팀 몫 — 구현 팀이 약하게 만들지 못하게
-    playwright.config.*|vitest.config.*|jest.config.*) echo locked ;;   # 테스트 러너 설정도 QA팀
+    # 둘 다 못 고침 — 테스트 파일은 어디에 있어도 QA팀
+    *.test.*|*.spec.*|*/__tests__/*|__tests__/*|src/test/*) echo locked ;;
+    # 백엔드
     src/main/java/*|src/main/kotlin/*|src/main/resources/*) echo backend ;;
     build.gradle|build.gradle.kts|settings.gradle|settings.gradle.kts|gradle.properties|gradle/*|gradlew|gradlew.bat) echo backend ;;
     pom.xml|mvnw|mvnw.cmd|.mvn/*) echo backend ;;
-    *) echo frontend ;;
+    # 프론트엔드 (목록에 있는 것만)
+    src/main/*) echo locked ;;   # 자바 쪽 다른 폴더는 판단 보류
+    src/*|public/*|index.html|android/*|ios/*) echo frontend ;;
+    capacitor.config.*|tailwind.config.*|postcss.config.*|tsconfig.json|tsconfig.*.json|eslint.config.*|.eslintrc*|.prettierrc*) echo frontend ;;
+    # 그 밖(tests/, docs/, package.json·잠금 파일, vite·vitest·playwright·jest 설정, .gitignore, .env*, state.json, HANDOFF.md …)
+    *) echo locked ;;
   esac
 }
 
@@ -34,11 +41,42 @@ team_of() {
   esac
 }
 
-# 저장소 안 어디든 "apps/<앱>/" 뒤 경로. 앱 폴더 밖이면 빈 값
-app_rel() {
-  local f="$1"
+# 경로를 "C:/a/b" 꼴로 (Windows Git Bash는 cygpath, 그 밖은 그대로) + 역슬래시 → 슬래시
+to_mixed() {
+  local f
+  f="$(printf '%s' "$1" | sed 's/\\\\/\//g; s/\\/\//g')"
+  if command -v cygpath >/dev/null 2>&1 && [ -n "$f" ]; then cygpath -m -- "$f" 2>/dev/null || printf '%s' "$f"
+  else printf '%s' "$f"; fi
+}
+
+repo_root() {
+  local r
+  r="$(git rev-parse --show-toplevel 2>/dev/null)"
+  [ -n "$r" ] || r="$CLAUDE_PROJECT_DIR"
+  to_mixed "$r"
+}
+
+# 저장소 기준 경로 (저장소 밖이거나 이상한 경로면 빈 값)
+repo_rel() {
+  local raw f root lf lr
+  raw="$(printf '%s' "$1" | sed 's/\\\\/\//g; s/\\/\//g')"
+  case "/$raw/" in */../*|*/./*) printf ''; return ;; esac   # 정규화 전에 . ·.. 조각 거부
+  f="$(to_mixed "$raw" | sed 's#//*#/#g')"
+  root="$(repo_root | sed 's#//*#/#g; s#/$##')"
+  lf="$(printf '%s' "$f" | tr 'A-Z' 'a-z')"; lr="$(printf '%s' "$root" | tr 'A-Z' 'a-z')"
   case "$f" in
-    apps/*/*|*/apps/*/*) printf '%s' "$f" | sed 's#^\(.*/\)\{0,1\}apps/[^/]*/##' ;;
+    /*|[A-Za-z]:*)
+      [ -n "$lr" ] || { printf ''; return; }
+      case "$lf" in "$lr"/*) printf '%s' "${f:$(( ${#root} + 1 ))}" ;; *) printf '' ;; esac ;;
+    *) printf '%s' "$f" ;;
+  esac
+}
+
+# 저장소 기준 경로 → "apps/<앱>/" 뒤 경로 (앱 폴더 밖이면 빈 값). 맨 앞 apps/<앱>/ 만 벗긴다
+app_rel() {
+  local r="$1"
+  case "$r" in
+    apps/*/*) printf '%s' "$r" | sed 's#^apps/[^/]*/##' ;;
     *) printf '' ;;
   esac
 }
@@ -47,27 +85,64 @@ if [ "$1" = "owner" ]; then
   owner_of "$2"; exit 0
 fi
 
-if [ "$1" = "check" ]; then
-  app="${2%/}"; agent="$3"; base="${4:-HEAD}"
-  team="$(team_of "$agent")"
-  if [ -z "$app" ] || [ -z "$team" ]; then
-    echo "사용법: team-files.sh check apps/<앱> backend-dev|frontend-dev [기준커밋]" >&2; exit 2
-  fi
+# ---- mark / check: 저장소 전체를 임시 인덱스로 찍어 비교 (실제 index·작업 폴더는 그대로) ----
+snap_tree() {
+  local idx t
+  idx="$(mktemp)"
+  GIT_INDEX_FILE="$idx" git read-tree HEAD 2>/dev/null || { rm -f "$idx"; return 1; }
+  GIT_INDEX_FILE="$idx" git add -A . >/dev/null 2>&1 || { rm -f "$idx"; return 1; }
+  t="$(GIT_INDEX_FILE="$idx" git write-tree)"; rm -f "$idx"; printf '%s' "$t"
+}
+# .gitignore로 빠진 것(폴더는 한 줄로) + 민감한 무시 파일의 내용 지문
+snap_ignored() {
+  git ls-files --others --ignored --exclude-standard --directory 2>/dev/null | sort
+  for s in .claude/settings.local.json; do
+    [ -f "$s" ] && printf '#sha %s %s\n' "$s" "$(git hash-object -- "$s")"
+  done
+}
+
+if [ "$1" = "mark" ] || [ "$1" = "check" ]; then
   root="$(git rev-parse --show-toplevel)" || exit 2
+  cd "$root" || exit 2
+  M="$(git rev-parse --git-dir)/team-files-mark"
+  if [ "$1" = "mark" ]; then
+    t="$(snap_tree)" || { echo "기준점을 찍지 못했습니다." >&2; exit 2; }
+    { echo "$t"; snap_ignored; } > "$M"
+    echo "기준점 찍음: $t"; exit 0
+  fi
+  app="${2%/}"; agent="$3"
+  team="$(team_of "$agent")"
+  case "$app" in apps/*) ;; *) app="" ;; esac
+  case "$app" in */*/*|*..*) app="" ;; esac
+  if [ -z "$app" ] || [ -z "$team" ]; then
+    echo "사용법: team-files.sh check apps/<앱> backend-dev|frontend-dev  (맡기기 직전에 team-files.sh mark)" >&2; exit 2
+  fi
+  [ -s "$M" ] || { echo "기준점 없음: 맡기기 직전에 bash .claude/hooks/team-files.sh mark 를 먼저 실행하세요." >&2; exit 2; }
+  base="$(head -n1 "$M")"
+  now="$(snap_tree)" || exit 2
   bad=0; n=0
   while IFS= read -r f; do
     [ -n "$f" ] || continue
     n=$((n+1))
-    rel="${f#"$app"/}"
+    rel="$(app_rel "$f")"
+    case "$f" in "$app"/*) ;; *) rel="" ;; esac
+    if [ -z "$rel" ]; then echo "경계 위반: $agent 이(가) 앱 폴더 밖 $f 을(를) 바꿈"; bad=1; continue; fi
     o="$(owner_of "$rel")"
-    if [ "$o" != "$team" ]; then
-      echo "경계 위반: $agent 이(가) $rel 을(를) 바꿈 (담당: $o)"; bad=1
-    fi
-  done < <( { git -C "$root" diff --name-only "$base" -- "$app"; git -C "$root" ls-files --others --exclude-standard -- "$app"; } | sort -u )
+    [ "$o" = "$team" ] || { echo "경계 위반: $agent 이(가) $f 을(를) 바꿈 (담당: $o)"; bad=1; }
+  done < <(git diff --name-only "$base" "$now")
+  # .gitignore로 숨긴 새 파일·폴더, 민감한 무시 파일 변경
+  while IFS= read -r l; do
+    case "$l" in
+      "#sha "*) echo "경계 위반: $agent 이(가) 무시 파일을 바꿈 — ${l#\#sha }"; bad=1 ;;
+      "$app"/*) ;;   # 앱 폴더 안 빌드 결과물(node_modules·build 등)은 허용
+      *) echo "경계 위반: $agent 이(가) .gitignore로 빠진 $l 을(를) 만듦"; bad=1 ;;
+    esac
+  done < <(comm -13 <(tail -n +2 "$M" | sort) <(snap_ignored | sort))
   if [ $bad -eq 0 ]; then echo "경계 확인: $agent 가 바꾼 파일 $n개 모두 $team 담당"; fi
   exit $bad
 fi
 
+# ---- 훅 ----
 input="$(cat)"
 agent="$1"
 if [ -z "$agent" ]; then
@@ -76,18 +151,18 @@ fi
 team="$(team_of "$agent")"
 [ -n "$team" ] || exit 0
 
-file="$(printf '%s' "$input" | sed -n 's/.*"\(file_path\|notebook_path\)"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\2/p' | head -n1 | sed 's/\\\\/\//g; s/\\/\//g')"
-rel="$(app_rel "$file")"
+file="$(printf '%s' "$input" | sed -n 's/.*"\(file_path\|notebook_path\)"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\2/p' | head -n1)"
+rel="$(app_rel "$(repo_rel "$file")")"
 
 if [ -z "$rel" ]; then
-  echo "훅이 막았습니다: $agent 는 apps/<앱>/ 안의 자기 팀 파일만 고칩니다. (시도한 파일: ${file:-알 수 없음})" >&2
+  echo "훅이 막았습니다: $agent 는 이 저장소 apps/<앱>/ 안의 자기 팀 파일만 고칩니다. (시도한 파일: ${file:-알 수 없음})" >&2
   exit 2
 fi
 o="$(owner_of "$rel")"
 [ "$o" = "$team" ] && exit 0
 
 case "$o" in
-  locked) why="테스트·문서·승인 기록은 QA팀·기획·사장 몫입니다. 바꿔야 하면 고치지 말고 답에 '요청: <파일> — <이유>'로 적어 메인 대화에 넘기세요." ;;
+  locked) why="테스트·문서·설정(package.json·vite/테스트 설정·.gitignore 등)·승인 기록은 통합(메인)·QA팀·기획·사장 몫입니다. 바꿔야 하면 고치지 말고 답에 '요청(통합|qa): <파일> — <무엇을 왜>'로 적어 넘기세요." ;;
   *) why="이 파일은 ${o} 담당입니다. 고치지 말고 답에 '요청(${o}): <파일> — <무엇을 왜>'로 적어 메인 대화(개발팀 통합)에 넘기세요." ;;
 esac
 echo "훅이 막았습니다: $agent 는 $team 파일만 고칩니다. (시도한 파일: $rel)

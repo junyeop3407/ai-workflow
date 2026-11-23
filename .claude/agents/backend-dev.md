@@ -17,7 +17,7 @@ color: orange
 
 ## 고칠 수 있는 파일 (훅이 지킨다)
 - 내 것: `apps/<앱>/` 안의 `src/main/java/**`·`src/main/kotlin/**`·`src/main/resources/**`, `build.gradle*`·`settings.gradle*`·`gradle/**`·`gradlew*`, `pom.xml`·`mvnw*`
-- 못 고침: 화면 코드(프론트엔드 담당), `tests/`·`src/test/**`(QA팀 — 구조 검사 `ArchitectureTest` 포함), `docs/`(api.md·data.md는 사장 승인본), `state.json`·`HANDOFF.md`, 앱 폴더 밖 전부
+- 못 고침: 화면 코드(프론트엔드 담당), `tests/`·`src/test/**`(QA팀 — 구조 검사 `ArchitectureTest` 포함), `docs/`(api.md·data.md는 사장 승인본), `.gitignore`·`.env*`, `state.json`·`HANDOFF.md`, 앱 폴더 밖 전부. 목록에 없는 파일은 못 고친다고 본다
 - Bash로 파일을 쓰거나 고치지 않는다(`sed -i`, `>`, `tee` 등). 메인 대화가 끝난 뒤 `team-files.sh check`로 바뀐 파일을 모두 확인한다.
 - 다른 팀 파일을 바꿔야 하면 고치지 말고 답의 `요청:` 줄로 넘긴다. API 모양(주소·요청·응답)을 api.md와 다르게 바꿔야 하면 특히 그렇다 — 규격 조율은 통합 담당이 한다.
 

@@ -203,7 +203,25 @@ row "backend-dev가 build.gradle Write" 통과 "$(run "$(agent_write_json backen
 row "backend-dev가 화면 코드 Write" 막힘 "$(run "$(agent_write_json backend-dev "$tmp/apps/demo/src/App.tsx")" team-files.sh)"
 row "backend-dev가 구조 검사 테스트(src/test) Write" 막힘 "$(run "$(agent_write_json backend-dev "$tmp/apps/demo/src/test/java/ArchitectureTest.java")" team-files.sh)"
 row "frontend-dev가 화면 코드 Write" 통과 "$(run "$(agent_write_json frontend-dev "$tmp/apps/demo/src/App.tsx")" team-files.sh)"
-row "frontend-dev가 Windows 경로로 화면 코드 Write" 통과 "$(run "$(agent_write_json frontend-dev 'C:\work\apps\demo\src\App.tsx')" team-files.sh)"
+winroot="$(cygpath -w "$tmp" 2>/dev/null || printf '%s' "$tmp")"
+row "frontend-dev가 Windows 경로로 화면 코드 Write" 통과 "$(run "$(agent_write_json frontend-dev "$winroot\\apps\\demo\\src\\App.tsx")" team-files.sh)"
+row "frontend-dev가 저장소 밖 다른 apps/ 경로 Write" 막힘 "$(run "$(agent_write_json frontend-dev '/elsewhere/apps/demo/src/App.tsx')" team-files.sh)"
+row "backend-dev가 화면 폴더 안 중첩 apps/../src/main/java Write" 막힘 "$(run "$(agent_write_json backend-dev "$tmp/apps/demo/src/apps/y/src/main/java/A.java")" team-files.sh)"
+row "frontend-dev가 대문자 Src/Main/Java Write" 막힘 "$(run "$(agent_write_json frontend-dev "$tmp/apps/demo/Src/Main/Java/A.java")" team-files.sh)"
+row "frontend-dev가 // 섞은 서버 경로 Write" 막힘 "$(run "$(agent_write_json frontend-dev "$tmp/apps/demo//src/main//java/A.java")" team-files.sh)"
+row "frontend-dev가 ./ 섞은 tests 경로 Write" 막힘 "$(run "$(agent_write_json frontend-dev "$tmp/apps/demo/./tests/a.ts")" team-files.sh)"
+row "frontend-dev가 package.json Write (통합 몫)" 막힘 "$(run "$(agent_write_json frontend-dev "$tmp/apps/demo/package.json")" team-files.sh)"
+row "frontend-dev가 vite.config Write (테스트 설정일 수 있음)" 막힘 "$(run "$(agent_write_json frontend-dev "$tmp/apps/demo/vite.config.ts")" team-files.sh)"
+row "frontend-dev가 src 안 테스트 파일(App.test.tsx) Write" 막힘 "$(run "$(agent_write_json frontend-dev "$tmp/apps/demo/src/App.test.tsx")" team-files.sh)"
+row "frontend-dev가 앱 .gitignore Write" 막힘 "$(run "$(agent_write_json frontend-dev "$tmp/apps/demo/.gitignore")" team-files.sh)"
+row "frontend-dev가 목록에 없는 파일(Makefile) Write — 기본 거부" 막힘 "$(run "$(agent_write_json frontend-dev "$tmp/apps/demo/Makefile")" team-files.sh)"
+# check 모드: mark 뒤 Bash로 바꾼 것까지 저장소 전체에서 확인
+bash "$H/team-files.sh" mark >/dev/null
+printf 'x\n' > apps/demo/src/ok.tsx
+row "check: mark 뒤 화면 파일만 바뀜" "exit 0" "$(bash "$H/team-files.sh" check apps/demo frontend-dev >/dev/null 2>&1; echo "exit $?")"
+printf 'x\n' > outside-team.txt
+row "check: 앱 폴더 밖 파일을 Bash로 만듦" "exit 1" "$(bash "$H/team-files.sh" check apps/demo frontend-dev >/dev/null 2>&1; echo "exit $?")"
+rm -f outside-team.txt apps/demo/src/ok.tsx
 row "frontend-dev가 서버 코드 Write" 막힘 "$(run "$(agent_write_json frontend-dev "$tmp/apps/demo/src/main/java/A.java")" team-files.sh)"
 row "frontend-dev가 tests/ Write" 막힘 "$(run "$(agent_write_json frontend-dev "$tmp/apps/demo/tests/a.spec.ts")" team-files.sh)"
 row "frontend-dev가 docs/api.md Write" 막힘 "$(run "$(agent_write_json frontend-dev "$tmp/apps/demo/docs/api.md")" team-files.sh)"
