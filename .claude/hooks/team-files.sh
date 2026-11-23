@@ -5,8 +5,10 @@
 #
 #   team-files.sh <에이전트>               : PreToolUse(Edit|Write|MultiEdit|NotebookEdit) — 에이전트 파일 frontmatter에서
 #   team-files.sh                          : settings.json에서 — 입력의 agent_type이 backend-dev·frontend-dev일 때만 검사
-#   team-files.sh mark                     : 메인이 에이전트에게 맡기기 **직전** — 저장소 전체 상태를 기준점으로 찍음
-#   team-files.sh check <앱폴더> <에이전트>  : 에이전트 답을 받은 **직후**(메인이 아무것도 쓰기 전) — 기준점 뒤에 바뀐 것이
+#   team-files.sh mark                     : 메인이 에이전트에게 맡기기 **직전** — 저장소 전체 상태를 찍어 기준 표(<트리>:<목록>)를 출력.
+#                                            표는 git 객체 해시(내용이 바뀌면 해시도 바뀜)라 에이전트가 고쳐 쓸 수 없다. 메인이 들고 있는다
+#   team-files.sh check <앱폴더> <에이전트> <기준 표>
+#                                          : 에이전트 답을 받은 **직후**(메인이 아무것도 쓰기 전) — 기준 뒤에 바뀐 것이
 #                                            Bash로 고친 것까지 모두 그 팀 파일인지 저장소 전체에서 확인(어긋나면 exit 1)
 #   team-files.sh owner <앱 폴더 기준 경로>  : 그 파일 담당(backend|frontend|locked) 한 단어
 
@@ -16,6 +18,7 @@ owner_of() {
   p="$(printf '%s' "$1" | tr 'A-Z' 'a-z')"
   case "/$p/" in
     *//*|*/./*|*/../*) echo locked; return ;;   # 빈 조각·. ·.. 이 든 경로는 판단하지 않고 거부
+    *./*|*" /"*|*:*|*~[0-9]*) echo locked; return ;;   # Windows가 바꿔 읽는 이름(끝 점·끝 공백, a:stream, 8.3 짧은 이름 PROGRA~1)
   esac
   case "$p" in
     # 둘 다 못 고침 — 테스트 파일은 어디에 있어도 QA팀
@@ -61,6 +64,7 @@ repo_rel() {
   local raw f root lf lr
   raw="$(printf '%s' "$1" | sed 's/\\\\/\//g; s/\\/\//g')"
   case "/$raw/" in */../*|*/./*) printf ''; return ;; esac   # 정규화 전에 . ·.. 조각 거부
+  case "${raw#[A-Za-z]:}" in *:*) printf ''; return ;; esac   # 드라이브 글자 말고 ':'가 있으면(:stream) 변환 전에 거부
   f="$(to_mixed "$raw" | sed 's#//*#/#g')"
   root="$(repo_root | sed 's#//*#/#g; s#/$##')"
   lf="$(printf '%s' "$f" | tr 'A-Z' 'a-z')"; lr="$(printf '%s' "$root" | tr 'A-Z' 'a-z')"
@@ -93,34 +97,53 @@ snap_tree() {
   GIT_INDEX_FILE="$idx" git add -A . >/dev/null 2>&1 || { rm -f "$idx"; return 1; }
   t="$(GIT_INDEX_FILE="$idx" git write-tree)"; rm -f "$idx"; printf '%s' "$t"
 }
-# .gitignore로 빠진 것(폴더는 한 줄로) + 민감한 무시 파일의 내용 지문
+# 빌드 결과물 폴더 이름 — 이 폴더는 "있음/없음"만 보고 안의 내용은 보지 않는다(설치·빌드 때마다 바뀜)
+is_build_dir() {
+  case "$1" in
+    */node_modules/|node_modules/|*/build/|build/|*/dist/|dist/|*/.gradle/|.gradle/|*/target/|target/|*/out/|*/coverage/|*/test-results/|*/playwright-report/|*/.vite/) return 0 ;;
+  esac
+  return 1
+}
+# .gitignore로 빠진 것과 git 설정의 지문. 줄마다:
+#   D <폴더>        빌드 결과물 폴더(있음만)
+#   F <파일> <해시>  그 밖의 무시 파일(무시 폴더 안 파일까지 하나씩, 2000개까지)
+#   G <이름> <해시>  .git/config · .git/info/exclude · .git/hooks 목록
 snap_ignored() {
-  git ls-files --others --ignored --exclude-standard --directory 2>/dev/null | sort
-  for s in .claude/settings.local.json; do
-    [ -f "$s" ] && printf '#sha %s %s\n' "$s" "$(git hash-object -- "$s")"
-  done
+  local e f gd
+  while IFS= read -r e; do
+    [ -n "$e" ] || continue
+    case "$e" in
+      */) if is_build_dir "$e"; then echo "D $e"
+          else find "$e" -type f 2>/dev/null | head -n 2000 | while IFS= read -r f; do echo "F $f $(git hash-object -- "$f")"; done; fi ;;
+      *) echo "F $e $(git hash-object -- "$e")" ;;
+    esac
+  done < <(git ls-files --others --ignored --exclude-standard --directory 2>/dev/null)
+  gd="$(git rev-parse --git-dir)"
+  for f in config info/exclude; do [ -f "$gd/$f" ] && echo "G $f $(git hash-object -- "$gd/$f")"; done
+  echo "G hooks $(ls -la "$gd/hooks" 2>/dev/null | git hash-object --stdin)"
 }
 
 if [ "$1" = "mark" ] || [ "$1" = "check" ]; then
   root="$(git rev-parse --show-toplevel)" || exit 2
   cd "$root" || exit 2
-  M="$(git rev-parse --git-dir)/team-files-mark"
   if [ "$1" = "mark" ]; then
     t="$(snap_tree)" || { echo "기준점을 찍지 못했습니다." >&2; exit 2; }
-    { echo "$t"; snap_ignored; } > "$M"
-    echo "기준점 찍음: $t"; exit 0
+    b="$(snap_ignored | sort | git hash-object -w --stdin)" || exit 2
+    echo "$t:$b"; exit 0
   fi
-  app="${2%/}"; agent="$3"
+  app="${2%/}"; agent="$3"; token="$4"
   team="$(team_of "$agent")"
   case "$app" in apps/*) ;; *) app="" ;; esac
   case "$app" in */*/*|*..*) app="" ;; esac
-  if [ -z "$app" ] || [ -z "$team" ]; then
-    echo "사용법: team-files.sh check apps/<앱> backend-dev|frontend-dev  (맡기기 직전에 team-files.sh mark)" >&2; exit 2
+  base="${token%%:*}"; blob="${token#*:}"
+  if [ -z "$app" ] || [ -z "$team" ] || [ -z "$token" ] || [ "$base" = "$token" ]; then
+    echo "사용법: team-files.sh check apps/<앱> backend-dev|frontend-dev <기준 표>  (기준 표 = 맡기기 직전 team-files.sh mark 의 출력)" >&2; exit 2
   fi
-  [ -s "$M" ] || { echo "기준점 없음: 맡기기 직전에 bash .claude/hooks/team-files.sh mark 를 먼저 실행하세요." >&2; exit 2; }
-  base="$(head -n1 "$M")"
+  [ "$(git cat-file -t "$base" 2>/dev/null)" = "tree" ] && [ "$(git cat-file -t "$blob" 2>/dev/null)" = "blob" ] \
+    || { echo "기준 표가 올바르지 않습니다: $token" >&2; exit 2; }
   now="$(snap_tree)" || exit 2
   bad=0; n=0
+  # 이름 바꾸기 감지를 끄고 지운 쪽·생긴 쪽을 모두 본다(잠긴 파일을 옮겨 숨기기 차단)
   while IFS= read -r f; do
     [ -n "$f" ] || continue
     n=$((n+1))
@@ -129,15 +152,15 @@ if [ "$1" = "mark" ] || [ "$1" = "check" ]; then
     if [ -z "$rel" ]; then echo "경계 위반: $agent 이(가) 앱 폴더 밖 $f 을(를) 바꿈"; bad=1; continue; fi
     o="$(owner_of "$rel")"
     [ "$o" = "$team" ] || { echo "경계 위반: $agent 이(가) $f 을(를) 바꿈 (담당: $o)"; bad=1; }
-  done < <(git diff --name-only "$base" "$now")
-  # .gitignore로 숨긴 새 파일·폴더, 민감한 무시 파일 변경
+  done < <(git diff --no-renames --name-only "$base" "$now")
+  # .gitignore로 숨긴 파일의 생김·바뀜·지움, git 설정 변경. 앱 폴더 안 빌드 결과물 폴더가 새로 생긴 것만 허용
   while IFS= read -r l; do
     case "$l" in
-      "#sha "*) echo "경계 위반: $agent 이(가) 무시 파일을 바꿈 — ${l#\#sha }"; bad=1 ;;
-      "$app"/*) ;;   # 앱 폴더 안 빌드 결과물(node_modules·build 등)은 허용
-      *) echo "경계 위반: $agent 이(가) .gitignore로 빠진 $l 을(를) 만듦"; bad=1 ;;
+      "D $app"/*) ;;
+      G\ *) echo "경계 위반: $agent 이(가) git 설정을 바꿈 — ${l#G }"; bad=1 ;;
+      *) echo "경계 위반: $agent 이(가) .gitignore로 빠진 것을 바꿈 — ${l#? }"; bad=1 ;;
     esac
-  done < <(comm -13 <(tail -n +2 "$M" | sort) <(snap_ignored | sort))
+  done < <(comm -3 <(git cat-file blob "$blob" | sort) <(snap_ignored | sort) | sed 's/^[[:space:]]*//; s/ [0-9a-f]\{40,64\}$//' | sort -u)
   if [ $bad -eq 0 ]; then echo "경계 확인: $agent 가 바꾼 파일 $n개 모두 $team 담당"; fi
   exit $bad
 fi

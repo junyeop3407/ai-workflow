@@ -43,9 +43,10 @@
 | 프론트엔드 | `src/**`(위 백엔드 폴더·`src/main/**`·`src/test/**` 제외), `public/**`, `index.html`, `android/**`·`ios/**`, `capacitor.config.*`·`tailwind.config.*`·`postcss.config.*`·`tsconfig*.json`·`eslint.config.*`·`.eslintrc*`·`.prettierrc*` |
 | 둘 다 못 고침 (**목록에 없으면 전부 여기 — 기본 거부**) | 테스트 파일(`tests/**`, `src/test/**`, 어디에 있든 `*.test.*`·`*.spec.*`·`__tests__/`), `docs/**`, `package.json`·잠금 파일·`vite.config.*`·테스트 러너 설정(통합·QA 몫 — 패키지 추가는 `요청(통합)`), `.gitignore`·`.env*`, `samples/**`, `state.json`, `HANDOFF.md`, `deploy.sh`, `.approved`, `.redteam-needed` |
 
-- 경로는 대소문자를 무시하고, `//`·`./`·`../`가 든 경로와 이 저장소 밖 경로는 거부한다. 앱 폴더는 저장소 기준 맨 앞 `apps/<앱>/`만 벗겨서 본다.
-- Edit·Write는 훅이 바로 막는다. Bash로 쓴 것은 메인이 **맡기기 직전** `bash .claude/hooks/team-files.sh mark`, **답을 받은 직후(메인이 아무것도 쓰기 전)** `bash .claude/hooks/team-files.sh check apps/<앱> <에이전트>`로 저장소 전체를 비교해 잡는다(앱 폴더 밖 변경, `.gitignore`로 숨긴 새 파일, `.claude/settings.local.json` 변경도 위반).
-- 남은 위험: 앱 폴더 안 `.gitignore`된 곳(node_modules·build 등)의 변경은 check가 보지 않는다(빌드 결과물이라 허용).
+- 경로는 대소문자를 무시하고, `//`·`./`·`../`가 든 경로, Windows가 바꿔 읽는 이름(끝 점·끝 공백, `a:stream`, `PROGRA~1` 같은 짧은 이름), 이 저장소 밖 경로는 거부한다. 앱 폴더는 저장소 기준 맨 앞 `apps/<앱>/`만 벗겨서 본다.
+- Edit·Write는 훅이 바로 막는다. Bash로 쓴 것은 메인이 **맡기기 직전** `bash .claude/hooks/team-files.sh mark`로 나온 **기준 표**(`<트리 해시>:<목록 해시>`, git 객체라 에이전트가 고쳐 쓸 수 없음)를 들고 있다가, **답을 받은 직후(메인이 아무것도 쓰기 전)** `bash .claude/hooks/team-files.sh check apps/<앱> <에이전트> <기준 표>`로 저장소 전체를 비교해 잡는다.
+  - 위반으로 보는 것: 앱 폴더 밖 변경, 다른 팀·잠긴 파일의 변경·지움·옮김(이름 바꾸기 감지를 끄고 양쪽을 다 봄), `.gitignore`로 빠진 파일의 생김·바뀜·지움(`.env`·`.claude/settings.local.json` 포함, 내용 해시 비교), `.git/config`·`.git/info/exclude`·`.git/hooks` 변경.
+- 남은 위험: 앱 폴더 안 빌드 결과물 폴더(`node_modules`·`build`·`dist`·`.gradle`·`target`·`coverage` 등)는 "생겼는지"만 보고 안의 내용은 보지 않는다(설치·빌드 때마다 바뀜). 무시 폴더 안 파일은 2000개까지만 해시한다.
 - 파일 하나의 담당: `bash .claude/hooks/team-files.sh owner <앱 폴더 기준 경로>`.
 - 메인 대화(통합)는 훅에 막히지 않는다. 그래도 bb·bf에서는 앱 코드를 직접 고치지 않고 에이전트에게 맡긴다.
 
