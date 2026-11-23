@@ -46,7 +46,11 @@ app_dir() { # apps/<앱> → 확인된 앱 이름
   local a="${1%/}"; a="${a#apps/}"
   printf '%s' "$a" | grep -Eq '^[a-z0-9][a-z0-9-]*$' || deny "앱 이름은 영문 소문자·숫자·하이픈만: $1"
   [ -d "$ROOT/apps/$a" ] || deny "앱 폴더가 없습니다: apps/$a"
-  APP="$a"; APPABS="$ROOT/apps/$a"
+  [ -L "$ROOT/apps/$a" ] && deny "앱 폴더가 바로가기(symlink)입니다 — 다른 곳을 연결할 수 있어 거부: apps/$a"
+  # 실제 경로(바로가기를 따라간 끝)가 저장소의 apps/ 바로 아래여야
+  local real base; real="$(cd "$ROOT/apps/$a" && pwd -P)"; base="$(cd "$ROOT/apps" && pwd -P)"
+  [ "$real" = "$base/$a" ] || deny "앱 폴더의 실제 위치가 저장소 apps/ 밖입니다: $real"
+  APP="$a"; APPABS="$real"
   # Windows: docker에 넘길 경로는 C:/… 꼴
   if (cd "$APPABS" && pwd -W) >/dev/null 2>&1; then APPHOST="$(cd "$APPABS" && pwd -W)"; else APPHOST="$APPABS"; fi
 }
