@@ -1,0 +1,32 @@
+# 견본: 연습용 DB(PostgreSQL) — apps/<앱>/compose.yaml 로 복사해 쓴다 (docs/docker-review.md 2절 ①)
+# 띄우기: bash .claude/hooks/dock.sh up apps/<앱> · 내리기: bash .claude/hooks/dock.sh down apps/<앱>
+# 규칙(dock.sh up 이 검사, 어기면 안 띄움):
+#   - image: 는 templates/docker/images.txt 의 "이름:태그@다이제스트" 그대로 (pin 뒤 아래 줄을 고정값으로 바꾼다)
+#   - 포트는 "127.0.0.1:<이 앱 포트>:<컨테이너 포트>" — <이 앱 포트>는 앱 HANDOFF '포트:' 줄과 같게(앱마다 다르게)
+#   - 비밀번호는 ${변수}로만, 값은 apps/<앱>/.env (커밋 안 함, .env.example 에 이름만)
+#   - 데이터는 이름 붙은 볼륨(지우지 않는 한 남음). 연습용 DB이므로 운영 DB와 따로(체크리스트 16)
+#   - build·privileged·network_mode·cap_add·devices·Docker 소켓·YAML 앵커는 쓰지 않는다
+services:
+  db:
+    image: postgres:17@sha256:<dock.sh pin postgres 뒤 images.txt의 다이제스트>
+    environment:
+      POSTGRES_DB: app
+      POSTGRES_USER: app
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+    ports:
+      - "127.0.0.1:55432:5432"
+    volumes:
+      - dbdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U app -d app"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+    mem_limit: 1g
+    cpus: 1
+    pids_limit: 256
+    security_opt:
+      - no-new-privileges:true
+
+volumes:
+  dbdata:

@@ -15,7 +15,8 @@
 | 교차 리뷰 (4·5단계, 필수) | `bash .claude/skills/build-app/cross-review.sh apps/<앱> <기준> [codex\|gemini]` |
 | 주간 회고 (반복된 실수 → 규칙 후보 최대 3개) | `/weekly-review` |
 | 잠금 상태 (누가 state·테스트 포트를 잡았나, 대기·지연) | `bash .claude/hooks/lock.sh status` |
-| 훅 시험 | `bash .claude/hooks/test-hooks.sh --settings` · `bash .claude/hooks/test-graph.sh` · `bash .claude/hooks/test-lock.sh` |
+| Docker (직접 `docker` 금지 — 훅이 막음) | `bash .claude/hooks/dock.sh check \| pin \| run \| up \| down \| ps \| clean` (`--dry-run`으로 미리보기, 허용 이미지 `templates/docker/images.txt`) |
+| 훅 시험 | `bash .claude/hooks/test-hooks.sh --settings` · `bash .claude/hooks/test-graph.sh` · `bash .claude/hooks/test-lock.sh` · `bash .claude/hooks/test-dock.sh` |
 
 ## 저장소 구조
 ```

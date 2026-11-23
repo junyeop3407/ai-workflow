@@ -1,0 +1,8 @@
+# 허용 이미지 목록 — dock.sh는 여기 적힌 이미지만 쓴다 (docs/docker-review.md 4절)
+# 칸(공백으로 구분): 별명  이미지:태그  다이제스트  실행 사용자  설명
+#   다이제스트: `bash .claude/hooks/dock.sh pin` 이 Docker로 실제 조회해 채운다(amd64·arm64 둘 다 있어야 통과). `-` 이면 아직 고정 안 됨 → 실행 거부.
+#   실행 사용자: `dock.sh run`의 --user 값. `-` = 이미지 기본(서비스용 DB처럼 compose로만 띄우는 것).
+#   새 이미지를 넣을 때는 공식 이미지(Docker 공식·Microsoft·Eclipse 등)만, 태그는 `latest` 금지. 넣은 뒤 pin → 커밋.
+postgres   postgres:17                -  -          DB(compose 서비스, 연습용)
+node       node:22-bookworm-slim      -  node       화면 빌드·Vitest·npm
+temurin    eclipse-temurin:21-jdk     -  1000:1000  Java·Gradle(백엔드 테스트)

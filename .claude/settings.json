@@ -32,6 +32,12 @@
           {
             "type": "command",
             "shell": "bash",
+            "command": "bash \"$CLAUDE_PROJECT_DIR/.claude/hooks/guard-docker.sh\"",
+            "timeout": 10
+          },
+          {
+            "type": "command",
+            "shell": "bash",
             "command": "bash \"$CLAUDE_PROJECT_DIR/.claude/hooks/protect-tests.sh\"",
             "timeout": 10
           },

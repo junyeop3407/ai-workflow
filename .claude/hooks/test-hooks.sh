@@ -171,6 +171,21 @@ row "wip: git --git-dir=… commit(다른 저장소 가리키기) → 예외 없
 row "wip: 메시지에 JSON 구분자 끼워 뒤 명령 숨기기 → 예외 없음(막힘)" 막힘 "$(run '{"session_id":"t","tool_name":"Bash","tool_input":{"command":"git commit -m x\",\"a\":\"; git switch main && git commit -m y","description":"x"}}' check-tests.sh commit)"
 row "git push --no-ver(줄인 옵션) → 막힘" 막힘 "$(run "$(bash_json "git push --no-ver")" guard-git.sh)"
 row "git -c CORE.HOOKSPATH=…(대문자) → 막힘" 막힘 "$(run "$(bash_json "git -c CORE.HOOKSPATH=x push")" guard-git.sh)"
+row "git push \"--no-verify\"(따옴표로 감싸기) → 막힘" 막힘 "$(run "$(bash_json 'git push "--no-verify"')" guard-git.sh)"
+row "core.hooks\\Path(역슬래시 끼우기) → 막힘" 막힘 "$(run "$(bash_json 'git -c core.hooks\Path=x push')" guard-git.sh)"
+# ---- Docker 직접 호출 막기 (guard-docker.sh): Docker는 dock.sh로만 ----
+row "docker run 직접 → 막힘" 막힘 "$(run "$(bash_json "docker run --privileged alpine")" guard-docker.sh)"
+row "cd x && docker compose up → 막힘" 막힘 "$(run "$(bash_json "cd apps/x && docker compose up -d")" guard-docker.sh)"
+row "sudo·경로·.exe 붙인 docker → 막힘" 막힘 "$(run "$(bash_json "sudo /usr/local/bin/docker.exe ps")" guard-docker.sh)"
+row "변수에 담은 docker(d=docker; \$d) → 막힘" 막힘 "$(run "$(bash_json 'd=docker; $d ps')" guard-docker.sh)"
+row "podman → 막힘" 막힘 "$(run "$(bash_json "podman run x")" guard-docker.sh)"
+row "Docker 소켓을 curl로 → 막힘" 막힘 "$(run "$(bash_json "curl --unix-socket /var/run/docker.sock http://x/containers/json")" guard-docker.sh)"
+row "bash .claude/hooks/dock.sh run … → 통과" 통과 "$(run "$(bash_json "bash .claude/hooks/dock.sh run apps/a node -- npm test")" guard-docker.sh)"
+row "커밋 메시지에 docker 낱말 → 통과" 통과 "$(run "$(bash_json 'git commit -m "docker 직접 호출 막기"')" guard-docker.sh)"
+row "grep docker 문서 → 통과" 통과 "$(run "$(bash_json "grep -n docker docs/docker-review.md")" guard-docker.sh)"
+row "따옴표 안 검색어 \"| docker |\"(표 줄 찾기) → 통과" 통과 "$(run "$(bash_json 'grep -n "^| docker |" HANDOFF.md')" guard-docker.sh)"
+row "bash -c '…docker…'(따옴표 안을 실행) → 막힘" 막힘 "$(run "$(bash_json "bash -c 'docker ps'")" guard-docker.sh)"
+row "eval \"…docker…\" → 막힘" 막힘 "$(run "$(bash_json 'eval "docker ps"')" guard-docker.sh)"
 row "wip: GIT_DIR=… git commit → 예외 없음(막힘)" 막힘 "$(run "$(bash_json "GIT_DIR=x git commit -m x")" check-tests.sh commit)"
 row "따옴표 섞은 merge 'wip/demo2' → 막힘" 막힘 "$(run "$(bash_json "git merge 'wip/demo2'")" guard-git.sh)"
 git branch -q main "$base_branch" 2>/dev/null   # (시험 저장소 기본 브랜치가 master일 때 main을 만들어 둠)
@@ -355,6 +370,9 @@ git -C "$pp" add -A; git -C "$pp" commit -qm "기획만"
 row "pre-push: 테스트 줄 없는 앱이지만 문서만 바뀜 → 올라감" 올라감 "$(git -C "$pp" push -q origin main >/dev/null 2>&1 && echo 올라감 || echo 거부)"
 echo 'x' > "$pp/apps/py/src/a.js"; git -C "$pp" add -A; git -C "$pp" commit -qm "코드"
 row "pre-push: 테스트 줄 없는 앱인데 코드가 바뀜 → 거부(모르면 막기)" 거부 "$(git -C "$pp" push -q origin main >/dev/null 2>&1 && echo 올라감 || echo 거부)"
+git -C "$pp" reset -q --hard HEAD~1; mkdir -p "$pp/apps/Bad \"Name\""; echo x > "$pp/apps/Bad \"Name\"/a.txt"; git -C "$pp" add -A; git -C "$pp" commit -qm "이상한 이름"
+row "pre-push: 안전하지 않은 앱 폴더 이름(대문자·공백·따옴표) → 거부" 거부 "$(git -C "$pp" push -q origin main >/dev/null 2>&1 && echo 올라감 || echo 거부)"
+git -C "$pp" reset -q --hard HEAD~1
 row "pre-push: 다른 브랜치 커밋을 체크아웃 없이 main으로 → 거부" 거부 "$(git -C "$pp" push -q origin wip/px:main >/dev/null 2>&1 && echo 올라감 || echo 거부)"
 
 # ---- 그래프 훅 (graph-prompt.sh, graph-stop.sh, guard-state.sh, session-start 그래프 줄) ----
@@ -445,6 +463,7 @@ if [ "$1" = "--settings" ]; then
     r="없음"; grep -q '^memory: project' "$f" && grep -q 'agent-memory-only.sh" '"$a" "$f" && r="등록됨"
     row "등록: $a 에이전트 memory + 메모리 훅" 등록됨 "$r"
   done
+  row "등록: PreToolUse Bash|PowerShell → guard-docker" 등록됨 "$(has PreToolUse 'Bash|PowerShell' guard-docker.sh)"
   row "등록: PreToolUse Edit|Write|MultiEdit|NotebookEdit → team-files" 등록됨 "$(has PreToolUse 'Edit|Write|MultiEdit|NotebookEdit' team-files.sh)"
   for a in backend-dev frontend-dev; do
     f="$src/.claude/agents/$a.md"
