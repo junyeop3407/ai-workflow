@@ -79,7 +79,9 @@ mkreq() { # 앱 폴더 — 기획서 검사(req)를 통과하는 기획서
 ' > "$1/docs/requirements.md"; }
 mkreq $A; mk docs/review_req.md
 G pass $A req >/dev/null;                               snap "기획 → ★기획 검토 대기" "-"
-boss ok-req "OK";                                       snap "★기획 검토 OK → 설계안" "★ OK"
+boss ok-req "OK";                                       snap "★기획 검토 OK → 법무 검토" "★ OK"
+printf '# 법무 검토 — shop\n이 문서는 AI가 공개 자료를 읽고 정리한 것이며 법률 자문이 아님.\n## 판정\n- [GREEN] 회원 이메일 — 쓰는 방식: 로그인 — 조건: 개인정보처리방침 고지 — 근거: 개인정보 보호법 안내 (2026-11-23)\n' > $A/docs/legal.md
+G pass $A lg >/dev/null; boss ok-lg "OK";              snap "법무 판정(GREEN) → ★법무 검토 OK → 설계안" "★ OK"
 mk docs/spec.md docs/design.md docs/premortem.md
 G pass $A opt >/dev/null; boss ok-opt "1번 안(추천)";    snap "설계안 → ★설계 선택 → 테스트 목록" "★ 1번"
 printf -- '- F1-1 → 장바구니 담기 (tests/test_a.spec.ts)
@@ -139,7 +141,7 @@ printf '# 레드팀\n- [의심] [보통] 로그인 요청 횟수 — 해결: tes
 mk docs/security-audit.md
 G pass $A rt >/dev/null; G pass $A sa >/dev/null;      snap "레드팀(⚙️ 표시 없음) → 보안 감사 → 점수(sc)" "-"
 # 점수 1바퀴: 체크리스트 일부 ✗ (가정)
-{ for i in $(seq 1 20); do case $i in 14|15|17|18) echo "| $i | ✗ | 근거: - |" ;; 13) echo "| $i | 해당 없음 | - |" ;; *) echo "| $i | ✓ | 근거: tests/test_a.spec.ts:1 |" ;; esac; done; } > $A/docs/checklist.md
+{ for i in $(seq 1 22); do case $i in 14|15|17|18) echo "| $i | ✗ | 근거: - |" ;; 13|21|22) echo "| $i | 해당 없음 | - |" ;; *) echo "| $i | ✓ | 근거: tests/test_a.spec.ts:1 |" ;; esac; done; } > $A/docs/checklist.md
 printf '## 꼭 되어야 할 기능\n- F1 장바구니 담기\n' > $A/docs/requirements.md
 printf -- '- F1 → 장바구니 담기 (tests/test_a.spec.ts)\n' > $A/docs/tests.md
 G score $A >/dev/null 2>&1;                            snap "⚙️ 완성도 1바퀴 < 90% → 가장 많이 깎은 bf로 자동" "-"
@@ -203,9 +205,9 @@ mkscore() { mkstate "$1" sc 진행; setst "$1" dv 건너뜀
   printf 'echo "  1 passed (0.5s)"\n' > "apps/$1/tests/run.sh"
   printf '# 레드팀\n' > "apps/$1/docs/redteam.md"; }
 cl() { # 앱, ✗ 번호들, 해당 없음 번호들
-  for i in $(seq 1 20); do
+  for i in $(seq 1 22); do
     if printf ' %s ' "$2" | grep -q " $i "; then echo "| $i | ✗ | 근거: - |"
-    elif printf ' %s ' "$3" | grep -q " $i "; then echo "| $i | 해당 없음 | - |"
+    elif printf ' %s 21 22 ' "$3" | grep -q " $i "; then echo "| $i | 해당 없음 | - |"   # 21·22(법무)는 점수 시험에서 해당 없음
     else echo "| $i | ✓ | 근거: tests/test_a.spec.ts:1 |"; fi; done > "apps/$1/docs/checklist.md"; }
 mkscore s1; cl s1 "" ""; touch apps/s1/.redteam-needed
 row "필수 관문 실패(.redteam-needed) → 점수 상관없이 rt로" "rt" "$(G score apps/s1 >/dev/null 2>&1; cur_of s1)"
@@ -248,11 +250,29 @@ row "깨진 state.json: 모르는 상태 → 멈춤(3)" 3 "$(rc G status apps/b3
 mkdir -p apps/m1; printf '# m1\n현재 단계: 4 (구현)\n' > apps/m1/HANDOFF.md
 G migrate apps/m1 >/dev/null
 row "migrate: 3단계까지 통과, 4단계 노드 확인 필요" "통과 통과 확인필요 대기" "$(st_of m1 ok-req) $(st_of m1 lock) $(st_of m1 bb) $(st_of m1 tr)"
-row "migrate: ★ 승인 기록 '이전 방식'(ok-req·ok-opt·ok-tl)" 3 "$(grep -c '"answer": "이전 방식"' "$(S m1)")"
+row "migrate: ★ 승인 기록 '이전 방식'(ok-req·ok-lg·ok-opt·ok-tl)" 4 "$(grep -c '"answer": "이전 방식"' "$(S m1)")"
 for n in ip ok-ip ui dd ok-ui ok-dd bb cb; do G confirm apps/m1 $n 통과 >/dev/null; done
 G confirm apps/m1 bf 대기 >/dev/null; G confirm apps/m1 cf 대기 >/dev/null
 row "migrate: 확인 필요를 다 정하면 첫 대기 노드부터" "bf" "$(cur_of m1)"
 row "lint: graph.md 점검 통과" 0 "$(rc G lint)"
+# ---- 법무 판정서 검사 (lg) ----
+mklg() { mkstate "$1" lg 진행; mkreq "apps/$1"; printf '## 외부 자료·데이터\n- 향수 목록 — 출처: https://example.com — 쓰는 방식: 화면 표시\n' >> "apps/$1/docs/requirements.md"; }
+lgok='이 문서는 AI가 정리한 것이며 법률 자문이 아님.\n## 판정\n'
+mklg l1; row "lg: legal.md 없음 → 거부" "1 lg" "$(rc G pass apps/l1 lg) $(cur_of l1)"
+printf "$lgok"'- [GREEN] 향수 목록 — 쓰는 방식: 화면 표시 — 조건: 출처 표시\n' > apps/l1/docs/legal.md
+row "lg: 근거: 없는 판정 → 거부" "1 lg" "$(rc G pass apps/l1 lg) $(cur_of l1)"
+printf "$lgok"'- [RED] 향수 목록 — 쓰는 방식: 화면 표시 — 근거: 약관 2조 (2026-11-23)\n' > apps/l1/docs/legal.md
+row "lg: RED인데 조치: 없음 → 거부" "1 lg" "$(rc G pass apps/l1 lg) $(cur_of l1)"
+printf "$lgok"'- [GREEN] 다른 자료 — 쓰는 방식: 참고 — 근거: x (2026-11-23)\n' > apps/l1/docs/legal.md
+row "lg: 기획서 외부 자료(향수 목록) 판정 빠짐 → 거부" "1 lg" "$(rc G pass apps/l1 lg) $(cur_of l1)"
+printf '## 판정\n- [GREEN] 향수 목록 — 쓰는 방식: 화면 표시 — 근거: x (2026-11-23)\n' > apps/l1/docs/legal.md
+row "lg: '법률 자문이 아님' 문구 없음 → 거부" "1 lg" "$(rc G pass apps/l1 lg) $(cur_of l1)"
+printf "$lgok"'- [RED] 향수 목록 — 쓰는 방식: 화면 표시 — 근거: 약관 2조 (2026-11-23) — 조치: 대체: 공식 API\n' > apps/l1/docs/legal.md
+row "lg: RED + 조치 있음 → 통과(★법무 검토에서 사장이 고름)" "0 ok-lg" "$(rc G pass apps/l1 lg) $(cur_of l1)"
+G approve apps/l1 ok-lg "대체 자료 찾기" >/dev/null
+row "ok-lg: 대체 자료 → 기획(req)으로 되돌림" "0 req" "$(rc G fail apps/l1 ok-lg "대체 자료 찾기" req) $(cur_of l1)"
+mkstate l2 lg 진행; setst l2 ok-lg 대기; setst l2 opt 대기; G skip apps/l2 lg "법무 해당 없음" >/dev/null
+row "lg 건너뛰기 → ok-lg도 함께 건너뛰고 설계안(opt)으로" "건너뜀 건너뜀 opt" "$(st_of l2 lg) $(st_of l2 ok-lg) $(cur_of l2)"
 sed 's#| docs/data.md, docs/api.md |#| docs/data.md, docs/DESIGN.md |#' "$src/.claude/skills/build-app/graph.md" > "$tmp/bad.md"
 row "lint: ui ∥ dd 가 같은 파일을 쓰게 바꾼 graph.md → 거부" 1 "$(GRAPH_MD="$tmp/bad.md" rc bash "$GS" lint)"
 rm -rf apps/e1 apps/p1 apps/b1 apps/b2 apps/b3 apps/m1
@@ -413,7 +433,7 @@ row "ui만 건너뛰기(화면 없음) → ok-ui·ug도 건너뜀, 서버 쪽은
 rm -rf apps/k1 apps/k2
 
 # F5. pass에 표에 없는 다음 노드를 주면 거부
-mkstate n1 sa 진행; echo '# 보안 감사' > apps/n1/docs/security-audit.md
+mkstate n1 sa 진행; echo '# 보안 감사' > apps/n1/docs/security-audit.md; echo '# 법무 출시 전 점검' > apps/n1/docs/legal.md
 row "sa 다음에 표에 없는 bf → 거부, 그대로 sa" "1 sa" "$(rc G pass apps/n1 sa bf) $(cur_of n1)"
 row "sa 다음에 없는 노드 zzz → 거부" 1 "$(rc G pass apps/n1 sa zzz)"
 row "sa 다음에 표에 있는 sc → 통과" "0 sc" "$(rc G pass apps/n1 sa sc) $(cur_of n1)"

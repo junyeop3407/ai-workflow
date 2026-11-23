@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
-# 개발팀 서브에이전트 파일 경계 (docs/org.md "개발팀"). backend-dev는 서버 파일만, frontend-dev는 화면 파일만 고친다.
+# 팀 에이전트 파일 경계 (docs/org.md). backend-dev는 서버 파일만, frontend-dev는 화면 파일만, legal은 docs/legal.md만 고친다.
 # 목록에 없는 파일은 **아무 팀도 못 고침(기본 거부)** — 테스트·문서·설정·state.json·HANDOFF·패키지 설정은 통합(메인)·QA·사장 몫.
 # jq 없이 동작한다.
 #
 #   team-files.sh <에이전트>               : PreToolUse(Edit|Write|MultiEdit|NotebookEdit) — 에이전트 파일 frontmatter에서
-#   team-files.sh                          : settings.json에서 — 입력의 agent_type이 backend-dev·frontend-dev일 때만 검사
+#   team-files.sh                          : settings.json에서 — 입력의 agent_type이 backend-dev·frontend-dev·legal일 때만 검사
 #   team-files.sh mark                     : 메인이 에이전트에게 맡기기 **직전** — 저장소 전체 상태를 찍어 기준 표(<트리>:<목록>)를 출력.
 #                                            표는 git 객체 해시(내용이 바뀌면 해시도 바뀜)라 에이전트가 고쳐 쓸 수 없다. 메인이 들고 있는다
 #   team-files.sh check <앱폴더> <에이전트> <기준 표>
@@ -21,6 +21,8 @@ owner_of() {
     *./*|*" /"*|*:*|*~[0-9]*) echo locked; return ;;   # Windows가 바꿔 읽는 이름(끝 점·끝 공백, a:stream, 8.3 짧은 이름 PROGRA~1)
   esac
   case "$p" in
+    # 법무팀 판정서는 법무팀만
+    docs/legal.md) echo legal ;;
     # 둘 다 못 고침 — 테스트 파일은 어디에 있어도 QA팀
     *.test.*|*.spec.*|*/__tests__/*|__tests__/*|src/test/*) echo locked ;;
     # 백엔드
@@ -40,6 +42,7 @@ team_of() {
   case "$1" in
     backend-dev) echo backend ;;
     frontend-dev) echo frontend ;;
+    legal) echo legal ;;
     *) echo "" ;;
   esac
 }
@@ -150,7 +153,7 @@ if [ "$1" = "mark" ] || [ "$1" = "check" ]; then
   case "$app" in */*/*|*..*) app="" ;; esac
   base="${token%%:*}"; blob="${token#*:}"
   if [ -z "$app" ] || [ -z "$team" ] || [ -z "$token" ] || [ "$base" = "$token" ]; then
-    echo "사용법: team-files.sh check apps/<앱> backend-dev|frontend-dev <기준 표>  (기준 표 = 맡기기 직전 team-files.sh mark 의 출력)" >&2; exit 2
+    echo "사용법: team-files.sh check apps/<앱> backend-dev|frontend-dev|legal <기준 표>  (기준 표 = 맡기기 직전 team-files.sh mark 의 출력)" >&2; exit 2
   fi
   [ "$(git cat-file -t "$base" 2>/dev/null)" = "tree" ] && [ "$(git cat-file -t "$blob" 2>/dev/null)" = "blob" ] \
     || { echo "기준 표가 올바르지 않습니다: $token" >&2; exit 2; }

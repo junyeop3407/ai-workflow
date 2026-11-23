@@ -32,7 +32,8 @@
 | 백엔드 SOLID | `.claude/rules/backend-solid.md`(원칙별 뜻·Spring 적용·위반 신호, 과한 추상화도 위반, 기준 "바깥 연결이거나 종류 2개 이상이면 인터페이스"). 확인: bb 때 QA팀이 ArchUnit `ArchitectureTest`를 JUnit에 넣어 위반 시 `./gradlew test` 실패 · cross-review.sh 요청문에 SOLID 점검 · qa-reviewer가 `[중간]`(`원칙: S/O/L/I/D/과함`) 지적. 시험 test-graph·test-hooks 통과. 사장 OK. 견본 `templates/ArchitectureTest.java`(ArchUnit 1.5.1, 규칙 6개) — context7 대신 공식 웹 문서·GitHub 소스로 확인(사장 허락). 깨끗한 견본 코드 6/6 통과, 심어 둔 위반 4개 모두 잡음 | ✅ 2026-11-22 |
 | 앞단계 보완 | 분석 `docs/front-stage-review.md`(사장 레퍼런스 3개 + Anthropic·grill-me·Spec Kit·EARS·Shape Up·사전 부검). 반영 ①~⑧: 성공 기준·빈칸 점검표 인터뷰(`SKILL.md` "기획 인터뷰", 견본 `templates/requirements.md`), Gemini 기획서 비판(`doc-review.sh`, agy), 사전 부검(`docs/premortem.md`), 수용 기준 `F1-1`, graph.sh 검사 `req`·`trace`·`undecided`, 되돌리기 어려운 동작 확인 절차, ★ 검토 요청 틀. 추가 ⑨~⑬도 반영: 수용 기준마다 `— 예:` 예시, 출시 안내문 3문장 + 예상 질문, 기능 `[1차|나중·꼭|많을수록|놀람]`(1차만으로 처음부터 끝까지 한 번 돌기, 나중은 테스트·점수에서 빠짐), ★기획 검토 때 회색 상자 화면 초안(`docs/wireframe/`, 절차만) | ✅ 2026-11-22 |
 | 조직 개편 ① 개발팀 | 사장의 "AI 가상오피스 조직 명세"(비서 제외)를 적용. 정한 것: Codex = 개발팀 **리뷰·통합 확인**(구현 안 함, 교차 리뷰 독립 유지), 백엔드·프론트는 **진짜 팀 에이전트** `backend-dev`·`frontend-dev`(sonnet, bb·bf에서 실제로 코드를 짬, 메인은 통합·업무 요청서·커밋). 파일 경계 훅 `team-files.sh`(Edit·Write 즉시 차단 + Bash로 쓴 것은 맡기기 직전 `mark`·받은 직후 `check`로 저장소 전체 비교, **목록에 없는 파일은 기본 거부** — 테스트·러너 설정·package.json·vite.config·`docs/`·.gitignore·state.json은 둘 다 못 고침, 경로는 저장소 기준·대소문자 무시·`//` `./` `../` 거부). 자동 보안 리뷰 지적 4개(경로 우회 2·check 범위·기본 허용) + 2차 4개(이름 바꾸기로 숨기기·기준점 파일 고쳐 쓰기 → 기준 표를 git 객체 해시로 메인이 들고 있음·Windows 특수 이름·무시 파일 내용/git 설정 비교) 반영. 조직도·책임표·업무 요청서 `docs/org.md`. 자동 루프(Stop 훅)는 메인에 그대로. 시험 test-hooks --settings 166개·test-graph 통과 | ✅ 2026-11-23 |
-| 조직 개편 ② 법무·경영 | 법무팀(외부 데이터·라이선스·개인정보 GREEN/YELLOW/RED)·경영팀(요구사항 변경 영향·순서 조정)을 넣을지·어디에 넣을지 사장 결정 대기. 실제 앱으로 backend-dev·frontend-dev 흐름은 아직 안 돌려 봄 | ⬜ 다음 |
+| 조직 개편 ② 법무팀 | 분석 `docs/org-phase2-review.md`(사장 OK: 법무 → 잠금 도구 → 경영 순서). `legal` 에이전트(opus, `docs/legal.md`만 씀·Bash 없음, 법률 자문 아님). 그래프 노드 `lg`(ok-req 뒤, 검사 `legal`: 안내 문구·판정 줄 형식·근거·RED는 조치·기획서 외부 자료 모두 판정) → `ok-lg`(★ YELLOW·RED는 조건부·대체·빼기, 대체·빼기면 req로). 외부 자료·개인정보가 둘 다 없으면 "법무 해당 없음"으로 둘 다 건너뜀. 기획서 견본에 `## 외부 자료·데이터`·`## 개인정보`. sa에서 출시 전 법무 점검, 체크리스트 20 → 22개(21 라이선스 고지, 22 RED 안 씀·YELLOW 조건대로). 시험 test-hooks --settings 172개·test-graph 통과 | ✅ 2026-11-23 |
+| 조직 개편 ③ 잠금 도구·경영팀 | 자원별 잠금 `lock.sh`(state:<앱>·env:port·git, FIFO·lease·세대 번호) → 경영팀 `manager`(요구사항 변경 영향·막힘·잠금 지연 때만). 실제 앱으로 개발팀·법무팀 흐름은 아직 안 돌려 봄 | ⬜ 다음 |
 | 다음 | 첫 앱 만들기 (`apps/<앱이름>/`) | ⬜ 다음 |
 | 교차 리뷰 | Codex + Gemini CLI 리뷰 (**둘 다 필수**, 변경분 1라운드, README 참고) | ✅ 준비됨 |
 | 구조 정리 | CLAUDE.md를 rules·skills·hooks·agents로 나눔 (130 → 93줄) | ✅ 2026-11-01 |
@@ -57,7 +58,8 @@
 │   ├── qa-reviewer.md                     5단계 분리 리뷰 (memory: project)
 │   ├── red-team.md                        6단계 실행 중인 앱 공격 (memory: project)
 │   ├── backend-dev.md                     개발팀 백엔드: bb에서 서버 코드 작성 (서버 파일만)
-│   └── frontend-dev.md                    개발팀 프론트엔드: bf에서 화면 코드 작성 (화면 파일만)
+│   ├── frontend-dev.md                    개발팀 프론트엔드: bf에서 화면 코드 작성 (화면 파일만)
+│   └── legal.md                           법무팀: lg·sa에서 docs/legal.md 판정 (그 파일만)
 ├── docs/org.md                            조직도·책임표·개발팀 파일 경계·업무 요청서
 ├── .claude/hooks/team-files.sh            개발팀 에이전트 파일 경계 (훅 + check·owner)
 ├── .claude/agent-memory/                  qa-reviewer·red-team 메모리 (커밋됨, 일반 패턴만)

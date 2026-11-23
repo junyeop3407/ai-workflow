@@ -401,6 +401,21 @@ undecided_ok() {
   UND_MSG="spec.md '아직 안 정한 것'에 구현 전에 정할 것이 남았습니다(사장에게 물어 정하거나 '나중: <이유>'):
 $(printf '%s\n' "$left" | sed 's/^/  - /')"; return 1
 }
+legal_ok() { # lg: 법무 판정서 형식 + 기획서의 외부 자료가 모두 판정됨 (판정 결과 자체는 ★ok-lg에서 사장이 고름)
+  local l="$APPDIR/docs/legal.md" bad="" j name
+  [ -f "$l" ] || { LEGAL_MSG="docs/legal.md가 없습니다(legal 에이전트가 씀)."; return 1; }
+  grep -q '법률 자문이 아님' "$l" || bad="$bad '법률 자문이 아님' 안내 문구 없음;"
+  j="$(sec_lines "$l" "판정")"
+  [ -n "$j" ] || bad="$bad '## 판정' 줄 없음;"
+  printf '%s\n' "$j" | grep . | grep -Ev '^[[:space:]]*- \[(GREEN|YELLOW|RED)\] ' | grep -q . && bad="$bad 판정 줄은 '- [GREEN|YELLOW|RED] <대상> …' 꼴이어야 함;"
+  printf '%s\n' "$j" | grep . | grep -v '근거:' | grep -q . && bad="$bad 근거: 없는 판정 줄 있음;"
+  printf '%s\n' "$j" | grep '\[RED\]' | grep -v '조치:' | grep -q . && bad="$bad RED 판정에 조치: 없음;"
+  while IFS= read -r name; do
+    [ -n "$name" ] || continue
+    printf '%s\n' "$j" | grep -qF -- "$name" || bad="$bad 기획서 외부 자료 '$name' 판정 없음;"
+  done < <(sec_lines "$APPDIR/docs/requirements.md" "외부 자료·데이터" | sed 's/^[[:space:]]*- //; s/ — .*//' | grep -v '^없음')
+  [ -z "$bad" ] && return 0; LEGAL_MSG="법무 판정서(docs/legal.md) 검사 실패:$bad"; return 1
+}
 redteam_ok() { [ ! -f "$APPDIR/.redteam-needed" ] && [ -f "$APPDIR/docs/redteam.md" ]; }
 secrets_ok() { SECRET_OUT="$(bash "$HOOKS/guard-git.sh" scan "$APPDIR" </dev/null 2>&1)"; }
 run_check() { # 노드의 ⚙️ 검사. 실패면 CHECK_MSG 와 함께 1
@@ -419,6 +434,7 @@ $SECRET_OUT"; return 1; } ;;
     req) req_ok || { CHECK_MSG="$REQ_MSG"; return 1; } ;;
     trace) trace_ok || { CHECK_MSG="$TRACE_MSG"; return 1; } ;;
     undecided) undecided_ok || { CHECK_MSG="$UND_MSG"; return 1; } ;;
+    legal) legal_ok || { CHECK_MSG="$LEGAL_MSG"; return 1; } ;;
     score) CHECK_MSG="sc는 graph.sh score 로만 통과합니다."; return 1 ;;
     *) CHECK_MSG="graph.md의 모르는 검사: $key"; return 1 ;;
   esac
@@ -898,7 +914,7 @@ cmd_lint() {
   [ -z "$(ids | sort | uniq -d)" ] || add "id 중복: $(ids | sort | uniq -d | paste -sd, -)"
   while IFS="$(printf '\t')" read -r id _ kind _ _ out _ chk nx rw jn fs mx sk old; do
     case "$kind" in AI|프로그램|외부AI|사람|AI+프로그램|끝) ;; *) add "$id: 모르는 종류 $kind" ;; esac
-    case "$chk" in -|lock|backend|tests|perf|redteam|secrets|score|req|trace|undecided) ;; *) add "$id: 모르는 검사 $chk" ;; esac
+    case "$chk" in -|lock|backend|tests|perf|redteam|secrets|score|req|trace|undecided|legal) ;; *) add "$id: 모르는 검사 $chk" ;; esac
     for x in $(opts "$nx") $(opts "$rw") $(opts "$jn"); do [ "$x" = "-" ] || is_node "$x" || add "$id: 없는 노드로 가는 엣지 $x"; done
     t="$(awk -F'\t' -v f="$id" '$1==f { print $2 }' "$FP" | sort -u | paste -sd, -)"
     f="$(opts "$fs" | tr ' ' '\n' | grep -v '^-$' | sort -u | paste -sd, -)"
@@ -923,7 +939,7 @@ cmd_lint() {
     done
   done
   for id in $(ids); do case "$seen" in *" $id "*) ;; *) add "req에서 닿지 않는 노드: $id" ;; esac; done
-  [ "$(grep -c '' "$CT")" -eq 20 ] || add "체크리스트가 20줄이 아님($(grep -c '' "$CT"))"
+  [ "$(grep -c '' "$CT")" -eq 22 ] || add "체크리스트가 22줄이 아님($(grep -c '' "$CT"))"
   while IFS="$(printf '\t')" read -r n _ _ own; do [ "$own" = "-" ] || is_node "$own" || add "체크리스트 $n 담당 없음: $own"; done < "$CT"
   grep -q '<!-- relock: ' "$GRAPH" || add "다시 잠그기 안내 줄(relock)이 없음"
   if [ -n "$errs" ]; then die 1 "graph.md 점검 실패:$errs"; fi

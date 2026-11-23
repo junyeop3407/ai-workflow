@@ -11,7 +11,7 @@
 
 ```mermaid
 flowchart TD
-  req["기획 🤖 기획팀"] --> okreq{{"★ 기획 검토"}} --> opt["설계안 + spec.md 🤖 팀 전체"] --> okopt{{"★ 설계 선택"}}
+  req["기획 🤖 기획팀"] --> okreq{{"★ 기획 검토"}} --> lg["법무 검토 🤖 법무팀 (외부 자료·개인정보 없으면 건너뜀)"] --> oklg{{"★ 법무 검토"}} --> opt["설계안 + spec.md 🤖 팀 전체"] --> okopt{{"★ 설계 선택"}}
   okopt --> tl["테스트 목록 🤖 QA팀"] --> oktl{{"★ 테스트 승인"}} --> tc["테스트 코드 🤖 QA팀"]
   tc --> lock["테스트 잠금 ⚙️ 처음은 자동"] --> ip["계획 🤖 계획 모드"]
   ip --> okip{{"★ 계획 승인 + 탐색 점검 비용·여부"}}
@@ -65,7 +65,9 @@ flowchart TD
 | id | 이름 | 종류 | 담당 | 받는 것 | 내는 것 | 통과 조건 | 검사 | 다음 | 다시 | 합류 | 실패 시 | 최대 | 건너뛰기 | 옛 단계 |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
 | req | 기획 | AI | 기획팀(빈칸 점검표 인터뷰·agent-reach·ecc:market-research·superpowers:brainstorming) + Gemini 기획서 비판(doc-review.sh) | 사장 답(★ 질문) | docs/requirements.md, docs/review_req.md | 성공 기준 + 빈칸 점검표 "묻기" 0개 + 기능(F1 …)마다 수용 기준(F1-1 …) + Gemini 비판 1라운드 반영 | req | ok-req | - | - | - | 2 | - | 1 |
-| ok-req | ★기획 검토 | 사람 | 사장 | docs/requirements.md | 승인 기록 | approve | - | opt | - | - | req | - | - | 1 |
+| ok-req | ★기획 검토 | 사람 | 사장 | docs/requirements.md | 승인 기록 | approve | - | lg | - | - | req | - | - | 1 |
+| lg | 법무 검토 | AI | 법무팀(legal 에이전트) | docs/requirements.md | docs/legal.md | 외부 자료마다 GREEN·YELLOW·RED + 근거, RED는 조치, 법률 자문 아님 안내 | legal | ok-lg | - | - | - | 2 | 법무 해당 없음 | 1 |
+| ok-lg | ★법무 검토 | 사람 | 사장 | docs/legal.md | 승인 기록 | approve(YELLOW·RED는 조건부 진행·대체 자료·빼기 중 고름) | - | opt | - | - | lg,req | - | 법무 해당 없음 | 1 |
 | opt | 설계안 | AI | 팀 전체(superpowers:brainstorming·awesome-design) | docs/requirements.md | docs/spec.md, docs/design.md, docs/premortem.md | 설계안 3개 + 점수표 + 디자인 방향 + 추천 + 추천안 사전 부검 | - | ok-opt | - | - | - | 3 | - | 2 |
 | ok-opt | ★설계 선택 | 사람 | 사장 | docs/design.md | 승인 기록 | approve | - | tl | - | - | opt | - | - | 2 |
 | tl | 테스트 목록 | AI | QA팀 | docs/spec.md | docs/tests.md | 쉬운 말 목록 + 수용 기준(F1-1 …)마다 테스트 하나 이상, 기획서에 없는 번호 없음 | trace | ok-tl | - | - | - | 2 | - | 3 |
@@ -90,7 +92,7 @@ flowchart TD
 | dv | DevTools·부하 점검 | 프로그램 | graph.sh(측정은 chrome-devtools MCP·부하 도구) | 실행 중인 앱(localhost) | docs/perf.txt | 수치 기준(아래) | perf | ex | - | - | bf,bb | 3 | 화면·서버 둘 다 없음 | 6 |
 | ex | 탐색·사용성 | AI | Claude 브라우저(localhost) | 주요 흐름 | docs/explore.md | 찾은 버그 해결 | - | rt | - | - | bf,bb | 3 | 사장이 건너뛰기 고름 | 6 |
 | rt | 레드팀 | AI+프로그램 | red-team 에이전트 | 실행 중인 앱 | docs/redteam.md | 심각 뚫림 해결 + .redteam-needed 없음 | redteam | sa | - | - | bb,bf | 3 | - | 6 |
-| sa | 보안 감사 | AI | security-audit | 저장소 | docs/security-audit.md | 확인된 문제 해결 | - | sc | - | - | bb,bf | 3 | - | 6 |
+| sa | 보안 감사 + 법무 출시 전 점검 | AI | security-audit + 법무팀(legal 에이전트, 라이선스 고지·약관이 실제와 맞는지) | 저장소 | docs/security-audit.md, docs/legal.md | 확인된 문제 해결 + legal.md `## 출시 전 점검` | - | sc | - | - | bb,bf | 3 | - | 6 |
 | sc | 완성도 점수 | 프로그램 | graph.sh score | checklist·리뷰·perf·tests | state.json score | 필수 관문 + 90% 이상 | score | ok-qa | - | - | bb,bf,ui,rt | 5 | - | 6 |
 | ok-qa | ★QA 보고·해결됐어요 | 사람 | 사장 | QA 보고(점수·항목별 ✓/✗·남은 것·사장 확인 필요) | 승인 기록 | approve(해결됐어요) | - | pub | - | - | bf,bb,ui,tl,req | - | - | 6 |
 | pub | ★공개 여부 | 사람 | 사장 | 비밀값 검사 결과 | HANDOFF 기록 | approve + 비밀값 0 | secrets | dep,done | - | - | - | - | - | 6 |
@@ -107,6 +109,8 @@ flowchart TD
 | 출발 | 실패 종류 | 보낼 곳 | 고친 뒤 | 먼저 묻기 |
 |---|---|---|---|---|
 | ok-req | 사장 수정 지시 | req | @normal | - |
+| ok-lg | 사장 수정 지시 | lg | @normal | - |
+| ok-lg | 자료·기능을 바꿔야 함(RED 빼기·대체 자료) | req | @normal | 사장 |
 | ok-opt | 사장 수정 지시 | opt | @normal | - |
 | ok-tl | 사장 수정 지시 | tl | @normal | - |
 | ok-ip | 사장 수정 지시 | ip | @normal | - |
@@ -132,7 +136,7 @@ flowchart TD
 <!-- fails:end -->
 표에 없는 실패 → 구현 전이면 ① 보기 + 추천으로 묻기, 구현~QA 보고 사이면 `docs/ask-later.md`(위 "멈추는 곳").
 
-## 배포 전 체크리스트 20개 → 채우는 노드 (빠지는 항목 0)
+## 배포 전 체크리스트 22개 → 채우는 노드 (빠지는 항목 0)
 결과는 `docs/checklist.md`에 `| 번호 | ✓ 또는 ✗ 또는 해당 없음 | 근거: <앱 폴더 기준 파일>:<줄> |` 한 줄씩. sc가 읽어 점수에 넣고 ok-qa 보고에 그대로. "담당"은 ✗일 때 sc가 보내는 노드(`-`는 사장 확인이 필요해 자동으로 못 고침).
 
 <!-- checklist:start -->
@@ -158,6 +162,8 @@ flowchart TD
 | 18 | axe 심각한 위반 0 | tc → tr⚙️, ug | bf |
 | 19 | LCP 2.5초·CLS 0.1 이하, 콘솔 에러 0 | dv⚙️ | bf |
 | 20 | 동시 50명 부하 에러 0%·응답 99% 1초 이하 | dv⚙️ | bb |
+| 21 | 오픈소스·외부 자료 라이선스 고지(고지 화면·NOTICE)와 출처 표시 | sa(법무 출시 전 점검) | bf |
+| 22 | RED 자료는 안 쓰고, YELLOW 자료는 사장이 고른 조건대로만 씀 | lg, sa | - |
 <!-- checklist:end -->
 
 ## pass 할 때 graph.sh가 더 보는 것
@@ -165,7 +171,7 @@ flowchart TD
 
 **내는 것**(종류 AI·AI+프로그램·외부AI 노드): '내는 것' 칸에서 **파일로 보는 것** = 공백이 없고 `/` 또는 `.확장자`가 든 것(앱 폴더 기준). 파일은 있고 비어 있지 않아야(공백만 있으면 빈 것), `/`로 끝나면 폴더 안에 빈 파일이 아닌 것이 1개 이상. **확인하지 않는 것** = 공백이 든 설명 말(승인 기록, 서버 코드, 화면 코드, 공개 주소, HANDOFF 테스트 실행 줄, state.json score)과 확장자 없는 낱말(JUnit). ★·프로그램 노드는 이 확인을 하지 않는다(⚙️ 검사가 따로 있음). 자동 루프(bb·bf)도 테스트 통과 뒤 이 확인을 넘어야 다음 노드로 간다.
 
-**건너뛰기 연쇄**: `skip`으로 한 노드를 건너뛰면 '건너뛰기' 칸이 **같은 글자**인 노드를 모두 함께 건너뛴다 — "서버 없음" = dd·ok-dd·bb·cb, "화면 없음" = ui·ok-ui·ug. 이미 통과한 노드가 그 안에 있으면 거부(앱 모양이 중간에 바뀐 것이라 사장에게 묻기).
+**건너뛰기 연쇄**: `skip`으로 한 노드를 건너뛰면 '건너뛰기' 칸이 **같은 글자**인 노드를 모두 함께 건너뛴다 — "서버 없음" = dd·ok-dd·bb·cb, "화면 없음" = ui·ok-ui·ug, "법무 해당 없음" = lg·ok-lg(기획서 `## 외부 자료·데이터`와 `## 개인정보`가 둘 다 `- 없음`일 때만, ok-req 통과 직후). 이미 통과한 노드가 그 안에 있으면 거부(앱 모양이 중간에 바뀐 것이라 사장에게 묻기).
 
 **테스트 개수 읽기**(bf·tr 검사, sc 필수 관문): 테스트 실행 줄이 성공(exit 0)해도 출력에서 개수를 읽어 **통과 수 ≥ 승인된 테스트 수, 건너뜀 0, 실패 0, 0개 아님**일 때만 통과. **개수를 못 읽으면 통과로 치지 않는다**(`run.sh`를 `exit 0`으로 바꾸는 위조 차단).
 - 승인된 테스트 수 = 잠긴 파일 안의 테스트 정의 수(`check-approved.sh count`): JS·TS `test('…')`·`it('…')`(+`.only`·`.fixme`·`.fail`·`.concurrent`), Python `def test_…`, Java·Kotlin `@Test`·`@ParameterizedTest`·`@RepeatedTest`. Playwright가 브라우저 3개에서 돌면 통과 수가 3배라 ≥로 비교한다.
@@ -204,6 +210,8 @@ flowchart TD
 
 **기획서 검사**(req, `req`): requirements.md에 ⓪ `## 출시 안내문`·`## 예상 질문` 아래 `- ` 줄 1개 이상 ① `## 성공 기준` 아래 `- ` 줄 1개 이상 ② `## 빈칸 점검표` 아래 `- ` 줄 1개 이상이고 `묻기`가 든 줄 0개 ③ `## 꼭 되어야 할 기능`의 기능 줄마다 `- F1 [1차|나중·꼭|많을수록|놀람] <기능>` 표시, 1차 기능 1개 이상, **1차** 기능마다 `F<번호>-<번호>` 수용 기준 1개 이상이고 수용 기준마다 `예:`(구체 예시) — `나중` 기능은 수용 기준이 없어도 되고 대조 검사·점수에서 빠진다 ④ `docs/review_req.md`(`doc-review.sh`가 만듦)의 `## Gemini 지적`에 `- ` 지적이 있으면 `## Claude 판단`에도 `- ` 줄 1개 이상. 하나라도 아니면 통과하지 않는다. 견본: `templates/requirements.md`.
 
+**법무 판정서 검사**(lg, `legal`): `docs/legal.md`에 ① `법률 자문이 아님` 문구 ② `## 판정` 아래 `- [GREEN|YELLOW|RED] <대상> — … — 근거: …` 줄 1개 이상, 줄마다 `근거:` ③ RED 줄마다 `조치:` ④ requirements.md `## 외부 자료·데이터`의 항목(`- 없음` 말고)마다 그 이름(` — ` 앞)이 `## 판정`에 나옴. 하나라도 아니면 통과하지 않는다. 형식 견본: `.claude/agents/legal.md`. YELLOW·RED가 있어도 lg는 통과한다 — 쓸지 말지는 ★ok-lg에서 사장이 고른다.
+
 **대조 검사**(tl, `trace`): requirements.md의 **1차 기능** 맨 끝 번호마다 tests.md에 `- <번호> →` 줄이 있어야 하고, tests.md의 `- F… →` 번호는 모두 requirements.md에 있어야 한다(빠진 기능·지어낸 기능 차단, Spec Kit analyze에 해당).
 
 **안 정한 것 검사**(ip, `undecided`): spec.md `## 아직 안 정한 것` 아래 `- ` 줄은 `- 없음`이거나 `나중:`(일부러 미룬 이유)이 들어 있어야 한다. 그 밖의 줄이 있으면 구현 전에 사장에게 물어 정한다.
@@ -212,7 +220,7 @@ flowchart TD
 
 ## 완성도 점수 (sc, `graph.sh score`)
 1. **필수 관문**(하나라도 실패 → 점수 전에 담당 노드로 자동 fail): 승인 테스트 100% + 개수 확인(통과 ≥ 승인·건너뜀 0, 못 읽으면 실패)(bf), 잠금 해시 일치(②), 비밀값 검사 0(bb, 서버 없으면 bf), redteam.md에 해결 안 된 `[뚫림] [심각]` 0(bb, 서버 없으면 bf), `.redteam-needed` 없음(rt).
-2. **점수** = 해당 항목 중 ✓ / 해당 항목 수(해당 없음 제외). 항목: 체크리스트 20개 · 리뷰 4곳 `[맞음]` 지적 · ug 지적 · perf 수치 · 꼭 되어야 할 기능.
+2. **점수** = 해당 항목 중 ✓ / 해당 항목 수(해당 없음 제외). 항목: 체크리스트 22개 · 리뷰 4곳 `[맞음]` 지적 · ug 지적 · perf 수치 · 꼭 되어야 할 기능.
 3. 90% 이상 → ok-qa(★): 점수·항목별 ✓/✗·남은 10%와 추천·`ask-later.md`를 한 번에 보고. 90% 미만 → ✗를 담당 노드별로 모아 가장 많이 깎은 노드로 자동 fail → 고친 뒤 tr → sc 다시.
 4. 브레이크: 점수 5바퀴 초과 또는 2바퀴 연속 점수가 안 오름 → ②.
 
