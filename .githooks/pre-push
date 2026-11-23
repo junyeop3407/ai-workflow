@@ -34,6 +34,11 @@ while read -r lref lsha rref rsha; do
     changed="$(git -c core.quotePath=false diff --name-only "$rsha" "$lsha" -- apps)"
     apps="$(printf '%s\n' "$changed" | cut -d/ -f2 | sort -u)"
   fi
+  # 이상한 경로(따옴표로 감싸진 이름·제어 문자·안전하지 않은 앱 이름)가 섞이면 판단하지 않고 거부(모르면 막기)
+  if printf '%s\n' "$changed" | grep -q '^"' || printf '%s\n' "$apps" | grep -v '^$' | grep -Evq '^[a-z0-9][a-z0-9-]*$'; then
+    echo "[pre-push] apps/ 아래에 안전하지 않은 이름(영문 소문자·숫자·하이픈 밖)이 있어 main에 올리지 않습니다." >&2
+    fail=1; continue
+  fi
   while IFS= read -r app; do
     [ -n "$app" ] || continue
     h="apps/$app/HANDOFF.md"
