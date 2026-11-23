@@ -47,6 +47,10 @@ fi
 
 # 1-2. 두 컴퓨터 동기화 (집 Windows ↔ 밖 Mac, 동시에는 안 씀 — 사장 2026-11-23)
 #      원격을 받아(fetch, 읽기만) 받을 것·안 올린 것·두 갈래·다른 컴퓨터의 임시 브랜치(wip/…)를 알린다. 고치지는 않는다.
+# git 자체 훅(.githooks/pre-push: main으로 가는 커밋은 테스트 통과만) — 컴퓨터마다 이 저장소 설정으로 연결
+if [ -f .githooks/pre-push ] && [ "$(git config --local --get core.hooksPath 2>/dev/null)" != ".githooks" ]; then
+  git config --local core.hooksPath .githooks && msg="$msg git 훅 경로를 .githooks 로 연결함(main push 전 테스트 확인)."
+fi
 if [ "${SYNC_CHECK:-1}" = 1 ] && git remote get-url origin >/dev/null 2>&1; then
   case "$(uname -s)" in Darwin) here=Mac ;; MINGW*|MSYS*|CYGWIN*) here=Windows ;; *) here="$(uname -s)" ;; esac
   sync=""

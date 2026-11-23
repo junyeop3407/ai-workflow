@@ -60,15 +60,19 @@ input="$(cat)"
 
 if [ "$mode" = "commit" ]; then
   # git commit 명령이 아니면 아무것도 하지 않는다
-  printf '%s' "$input" | grep -q 'git commit' || exit 0
+  # git과 commit 사이에 옵션이 끼어도(git -c … commit, git --git-dir=… commit, git -C … commit) 커밋으로 본다
+  printf '%s' "$input" | grep -Eq '(^|[^[:alnum:]_.-])git([[:space:]]+[^[:space:];&|]+)*[[:space:]]+commit([[:space:]]|"|$)' || exit 0
   # 예외(사장 결정 2026-11-23): 임시 브랜치 wip/<앱> 에서만 테스트가 실패한 채로 커밋할 수 있다 —
   # 구현 중에 다른 컴퓨터(집 Windows ↔ 밖 Mac)로 옮기려고. main 등 다른 브랜치는 그대로 막는다.
   # wip를 main에 합칠 때는 guard-git.sh가 --squash를 요구해서, 합친 뒤의 git commit 에서 이 검사가 다시 돈다.
   # 승인된 테스트 잠금 검사(check-approved.sh commit)는 wip에서도 그대로.
   # 예외는 "git commit 하나만 있는 명령"일 때만: 훅은 실행 전 브랜치를 보므로, 이어 붙인 명령(;·&&·||·|·줄바꿈)이나
   # 브랜치를 바꾸는 명령(switch·checkout·reset·update-ref·symbolic-ref·branch·worktree·-C)이 섞이면 예외를 주지 않는다.
-  wcmd="$(printf '%s' "$input" | tr '\n' ' ' | sed -n 's/.*"command"[[:space:]]*:[[:space:]]*"//p' | sed 's/"[[:space:]]*,[[:space:]]*"[a-z_]*"[[:space:]]*:.*//; s/"[[:space:]]*}.*//')"
-  if ! printf '%s' "$wcmd" | grep -Eq '[;&|`]|\\n|\$\(|(^|[[:space:]])(switch|checkout|reset|update-ref|symbolic-ref|branch|worktree|-C)([[:space:]]|$)'; then
+  #   더 좁게: 명령 전체가 정확히 `git commit [-a] [-q] -m "<메시지>" [-m "<메시지>"]` 꼴일 때만(앞에 환경 변수·git 전역 옵션
+  #   --git-dir·--work-tree·-c 등이 붙으면 다른 저장소를 가리킬 수 있어 예외 없음). 마지막 방어선은 .githooks/pre-push.
+  wcmd="$(printf '%s' "$input" | tr '\n' ' ' | sed -n 's/.*"command"[[:space:]]*:[[:space:]]*"//p' | sed 's/\\"/"/g; s/"[[:space:]]*,[[:space:]]*"[a-z_]*"[[:space:]]*:.*//; s/"[[:space:]]*}[}[:space:]]*$//')"
+  if printf '%s' "$wcmd" | grep -Eq '^[[:space:]]*git[[:space:]]+commit([[:space:]]+(-a|-q|-m[[:space:]]+("[^"`$\\;&|]*"|[^[:space:]"'"'"'`$\\;&|-][^[:space:]"'"'"'`$\\;&|]*)))+[[:space:]]*$' \
+     && ! printf '%s' "$wcmd" | grep -Eq '[;&|`]|\$\(|(^|[[:space:]])(switch|checkout|reset|update-ref|symbolic-ref|branch|worktree)([[:space:]]|$)'; then
     case "$(git symbolic-ref --quiet --short HEAD 2>/dev/null)" in
       wip/*) exit 0 ;;
     esac

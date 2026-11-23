@@ -164,6 +164,11 @@ row "push.default 바꾸기(-c push.default=upstream) → 막힘" 막힘 "$(run 
 row "wip 브랜치 이름을 main으로 바꾸기(branch -M) → 막힘" 막힘 "$(run "$(bash_json "git branch -M wip/demo2 main")" guard-git.sh)"
 row "update-ref로 main 옮기기 → 막힘" 막힘 "$(run "$(bash_json "git update-ref refs/heads/main wip/demo2")" guard-git.sh)"
 row "main에서 reset --hard wip/demo2 → 막힘" 막힘 "$(run "$(bash_json "git reset --hard wip/demo2")" guard-git.sh)"
+row "git -c … push --force(옵션 끼워 넣기) → 막힘" 막힘 "$(run "$(bash_json "git -c a=b push --force origin main")" guard-git.sh)"
+row "git push --no-verify(git 훅 건너뛰기) → 막힘" 막힘 "$(run "$(bash_json "git push --no-verify")" guard-git.sh)"
+row "git -c core.hooksPath=… (훅 경로 바꾸기) → 막힘" 막힘 "$(run "$(bash_json "git -c core.hooksPath=/dev/null push")" guard-git.sh)"
+row "wip: git --git-dir=… commit(다른 저장소 가리키기) → 예외 없음(막힘)" 막힘 "$(run "$(bash_json "git --git-dir=../o commit -m x")" check-tests.sh commit)"
+row "wip: GIT_DIR=… git commit → 예외 없음(막힘)" 막힘 "$(run "$(bash_json "GIT_DIR=x git commit -m x")" check-tests.sh commit)"
 row "따옴표 섞은 merge 'wip/demo2' → 막힘" 막힘 "$(run "$(bash_json "git merge 'wip/demo2'")" guard-git.sh)"
 git branch -q main "$base_branch" 2>/dev/null   # (시험 저장소 기본 브랜치가 master일 때 main을 만들어 둠)
 git branch -q --set-upstream-to=main 2>/dev/null
@@ -321,6 +326,25 @@ echo dirty >> "$sy/home/HANDOFF.md"
 row "동기화: 커밋 안 한 변경 → 알림" 알림 "$(syn "$sy/home" | grep -q '커밋 안 한 변경 1개' && echo 알림)"
 git -C "$sy/home" remote set-url origin "$sy/없는곳.git"
 row "동기화: 원격 확인 실패(인터넷) → 알림" 알림 "$(syn "$sy/home" | grep -q '확인하지 못함' && echo 알림)"
+
+# ---- git 자체 훅 .githooks/pre-push: main으로 가는 커밋은 실제 테스트 통과만 (글자 막기의 마지막 방어선) ----
+pp="$sy/pp"; git clone -q "$sy/origin.git" "$pp" 2>/dev/null; cfg "$pp"
+mkdir -p "$pp/.claude/skills" "$pp/.githooks"; cp -r "$src/.claude/hooks" "$pp/.claude/"; cp -r "$src/.claude/skills/build-app" "$pp/.claude/skills/"; cp "$src/.githooks/pre-push" "$pp/.githooks/"
+row "세션 시작 → git 훅 경로(.githooks) 자동 연결" ".githooks" "$(syn "$pp" >/dev/null; git -C "$pp" config --local --get core.hooksPath)"
+mkdir -p "$pp/apps/px/tests"; printf '# px\n테스트 실행: `bash tests/run.sh`\n' > "$pp/apps/px/HANDOFF.md"; printf 'echo "  1 failed"; exit 1\n' > "$pp/apps/px/tests/run.sh"
+git -C "$pp" add -A; git -C "$pp" commit -qm "실패 상태"
+mb="$(git -C "$pp" symbolic-ref --short HEAD)"; git -C "$pp" branch -q -m "$mb" main 2>/dev/null
+rmain() { git -C "$sy/origin.git" rev-parse -q --verify refs/heads/main 2>/dev/null; }
+before="$(rmain)"
+row "pre-push: 테스트 실패 커밋을 main으로 push → git이 거부" "거부 그대로" "$(git -C "$pp" push -q origin main >/dev/null 2>&1 && echo 올라감 || echo 거부) $([ "$(rmain)" = "$before" ] && echo 그대로 || echo 바뀜)"
+git -C "$pp" switch -q -c wip/px
+row "pre-push: 같은 커밋을 임시 브랜치로 push → 허용" 0 "$(git -C "$pp" push -q -u origin wip/px >/dev/null 2>&1; echo $?)"
+row "pre-push: 임시 브랜치에서 wip/px:main 으로 push(글자 훅을 거치지 않음) → 거부" 거부 "$(git -C "$pp" push -q origin wip/px:main >/dev/null 2>&1 && echo 올라감 || echo 거부)"
+git -C "$pp" switch -q main; printf 'echo "  1 passed"; exit 0\n' > "$pp/apps/px/tests/run.sh"
+row "pre-push: 커밋 안 한 변경이 있으면 → 거부" 거부 "$(git -C "$pp" push -q origin main >/dev/null 2>&1 && echo 올라감 || echo 거부)"
+git -C "$pp" add -A; git -C "$pp" commit -qm "고침"
+row "pre-push: 테스트 통과 커밋을 main으로 → 올라감" 올라감 "$(git -C "$pp" push -q origin main >/dev/null 2>&1 && echo 올라감 || echo 거부)"
+row "pre-push: 다른 브랜치 커밋을 체크아웃 없이 main으로 → 거부" 거부 "$(git -C "$pp" push -q origin wip/px:main >/dev/null 2>&1 && echo 올라감 || echo 거부)"
 
 # ---- 그래프 훅 (graph-prompt.sh, graph-stop.sh, guard-state.sh, session-start 그래프 줄) ----
 G="$src/.claude/skills/build-app/graph.sh"

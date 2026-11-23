@@ -115,7 +115,7 @@ AI 팀 운영: `.claude/rules/ai-team.md` 를 따른다.
 - git add / commit / pull / push / cd는 `&&` `;`로 잇지 말고 한 줄에 하나씩 실행한다(승인 단어가 든 명령에 붙이면 막힘).
 
 ## 절대 하지 않을 것 (대부분 훅이 막는다 — 막히면 우회하지 말고 고친다)
-- 테스트가 실패하는 상태로 커밋 *(훅: check-tests)* — 예외는 임시 브랜치 `wip/<앱>`뿐(구현 중 다른 컴퓨터로 옮길 때, `/handoff` "다른 컴퓨터로 옮길 때"). main으로는 `--squash` 합치기 + 테스트 통과 커밋으로만 *(훅: guard-git)*
+- 테스트가 실패하는 상태로 커밋 *(훅: check-tests)* — 예외는 임시 브랜치 `wip/<앱>`뿐(구현 중 다른 컴퓨터로 옮길 때, `/handoff` "다른 컴퓨터로 옮길 때"). main으로는 `--squash` 합치기 + 테스트 통과 커밋으로만 *(훅: guard-git, 마지막 방어선: git 훅 `.githooks/pre-push`가 main push 때 테스트를 실제로 돌림)*
 - 비밀번호·API 키·토큰·`.env`·키 파일 커밋. 필요하면 `.env.example`에 이름만 *(훅: guard-git)*
 - 특정 컴퓨터에만 있는 경로를 코드·설정에 넣기. 경로는 저장소 기준 상대 경로로 *(훅: guard-git)*
 - `node_modules`, 빌드 결과물, 가상환경 커밋 *(훅: guard-git)*

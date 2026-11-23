@@ -1,0 +1,49 @@
+#!/usr/bin/env bash
+# git push 직전(git 자체 훅) — main(또는 master)으로 올라가는 커밋은 **실제로 테스트를 돌려 통과**해야만 올린다.
+# Claude Code 훅(guard-git·check-tests)은 명령 글자를 읽어 막으므로 별명·refspec·이름 바꾸기 같은 우회가 남는다.
+# 이 훅은 git이 실제로 올리는 대상(원격 브랜치 이름·커밋)을 보고 판단하는 마지막 방어선이다.
+#   - main으로 올리는 커밋 = 지금 체크아웃한 커밋(HEAD)이고, 커밋 안 한 변경이 없을 때만(테스트 결과 = 올릴 커밋)
+#   - 이번에 바뀐 앱(apps/<앱>/)마다 HANDOFF의 테스트 줄을 돌려 하나라도 실패하면 거부
+#   - main 삭제 push 거부
+# 다른 브랜치(wip/… 등)로 올리는 것은 검사하지 않는다(사장 결정: 임시 브랜치는 실패 상태여도 옮길 수 있음).
+# 켜기: git config core.hooksPath .githooks (세션 시작 훅이 컴퓨터마다 자동으로 맞춘다)
+
+root="$(git rev-parse --show-toplevel)" || exit 1
+cd "$root" || exit 1
+CT="$root/.claude/hooks/check-tests.sh"
+G="$root/.claude/skills/build-app/graph.sh"
+z40=0000000000000000000000000000000000000000
+fail=0
+
+while read -r lref lsha rref rsha; do
+  case "$rref" in refs/heads/main|refs/heads/master) ;; *) continue ;; esac
+  if [ "$lsha" = "$z40" ]; then echo "[pre-push] $rref 삭제는 거부합니다." >&2; fail=1; continue; fi
+  if [ "$lsha" != "$(git rev-parse HEAD)" ]; then
+    echo "[pre-push] $rref 로는 지금 체크아웃한 커밋만 올릴 수 있습니다(테스트를 돌려 확인하려고). 'git switch main' 뒤 'git push'." >&2
+    fail=1; continue
+  fi
+  if [ -n "$(git status --porcelain --untracked-files=no)" ]; then
+    echo "[pre-push] 커밋 안 한 변경이 있어 테스트 결과가 올릴 커밋과 다를 수 있습니다. 커밋하거나 되돌린 뒤 다시 push." >&2
+    fail=1; continue
+  fi
+  if [ "$rsha" = "$z40" ] || ! git cat-file -e "$rsha" 2>/dev/null; then
+    apps="$(ls -d apps/*/ 2>/dev/null | cut -d/ -f2)"
+  else
+    apps="$(git diff --name-only "$rsha" "$lsha" -- apps | cut -d/ -f2 | sort -u)"
+  fi
+  for app in $apps; do
+    h="apps/$app/HANDOFF.md"
+    [ -f "$h" ] && grep -q '테스트 실행:' "$h" || continue
+    key=""
+    if [ -f "apps/$app/state.json" ] && [ -f "$G" ] && bash "$G" current "apps/$app" --status </dev/null 2>/dev/null | grep -Eq '^(bb|cb):' && grep -q '백엔드 테스트:' "$h"; then
+      key="백엔드"
+    fi
+    if ! out="$(bash "$CT" app "apps/$app" $key </dev/null 2>&1)"; then
+      echo "[pre-push] $rref 로 올리려는 커밋에서 apps/$app 테스트가 실패해 push를 막았습니다(main은 테스트 통과만):" >&2
+      printf '%s\n' "$out" | tail -n 20 >&2
+      fail=1
+    fi
+  done
+done
+
+exit $fail
