@@ -233,7 +233,15 @@ mv apps/demo/src/moved.py apps/demo/tests/test_main.py
 git config core.hooksPath /nowhere
 row "check: git 설정(core.hooksPath)을 바꿈" "exit 1" "$(cf "$tok")"
 git config --unset core.hooksPath
-rm -f apps/demo/src/ok.tsx
+printf '#!/bin/sh\n' > .git/hooks/pre-commit
+row "check: .git/hooks에 새 훅 파일을 만듦" "exit 1" "$(cf "$tok")"
+tok="$(bash "$H/team-files.sh" mark 2>/dev/null)"
+m0="$(ls -ld .git/hooks/pre-commit | cut -c1-10)"
+chmod +x .git/hooks/pre-commit 2>/dev/null
+if [ "$(ls -ld .git/hooks/pre-commit | cut -c1-10)" != "$m0" ]; then   # Windows는 권한이 #! 내용으로 정해져 chmod로 안 바뀜 → 그때는 이 줄을 건너뜀
+  row "check: git 훅의 실행 권한만 바꿈" "exit 1" "$(cf "$tok")"
+fi
+rm -f .git/hooks/pre-commit apps/demo/src/ok.tsx
 row "frontend-dev가 서버 코드 Write" 막힘 "$(run "$(agent_write_json frontend-dev "$tmp/apps/demo/src/main/java/A.java")" team-files.sh)"
 row "frontend-dev가 tests/ Write" 막힘 "$(run "$(agent_write_json frontend-dev "$tmp/apps/demo/tests/a.spec.ts")" team-files.sh)"
 row "frontend-dev가 docs/api.md Write" 막힘 "$(run "$(agent_write_json frontend-dev "$tmp/apps/demo/docs/api.md")" team-files.sh)"

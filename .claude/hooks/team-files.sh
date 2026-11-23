@@ -110,9 +110,14 @@ is_build_dir() {
 #   T <폴더> <해시>  그 밖의 무시 폴더 — 안의 파일 전부(개수 제한 없음)의 경로·내용을 합친 해시
 #   G <이름> <해시>  git 설정: config·config.worktree·info/*·hooks/* 내용(공용 git 폴더 포함), `git config --list` 전체(전역·시스템 포함)
 # 남은 위험(사장 확인한 선택): 빌드 결과물 폴더(node_modules 등)는 수만 개라 내용을 해시하지 않는다.
-dir_hash() { # 폴더 안 파일 전부의 "경로 내용해시" 목록 → 한 해시
-  local d="$1" f
-  find "$d" -type f 2>/dev/null | LC_ALL=C sort | while IFS= read -r f; do printf '%s %s\n' "$f" "$(git hash-object -- "$f")"; done | git hash-object --stdin
+dir_hash() { # 폴더 안 모든 항목(파일·폴더·바로가기)의 "종류·권한·경로·내용(바로가기는 가리키는 곳)" 목록 → 한 해시
+  local d="$1" f m
+  find "$d" -mindepth 1 2>/dev/null | LC_ALL=C sort | while IFS= read -r f; do
+    m="$(ls -ld -- "$f" 2>/dev/null | cut -c1-10)"   # 종류+권한(실행 권한 포함) 예: -rwxr-xr-x, lrwxrwxrwx
+    if [ -L "$f" ]; then printf '%s %s -> %s\n' "$m" "$f" "$(readlink -- "$f")"
+    elif [ -f "$f" ]; then printf '%s %s %s\n' "$m" "$f" "$(git hash-object -- "$f")"
+    else printf '%s %s\n' "$m" "$f"; fi
+  done | git hash-object --stdin
 }
 snap_ignored() {
   local e d f
