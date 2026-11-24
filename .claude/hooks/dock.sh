@@ -54,11 +54,13 @@ src_check() {
     if (s ~ /[][{}]/) print NR "번째 줄: 흐름 문법({ } [ ]) 대신 줄 바꿈 목록으로"
     if (s ~ /^[[:space:]]*(-[[:space:]]*)?"[^"]*"[[:space:]]*:/ || s ~ ("^[[:space:]]*(-[[:space:]]*)?" q "[^" q "]*" q "[[:space:]]*:")) print NR "번째 줄: 따옴표 붙은 키"
     if (s ~ /^[[:space:]]*(-[[:space:]]*)?(type|source)[[:space:]]*:/) print NR "번째 줄: type:/source:(긴 볼륨 문법) 대신 \"이름:/경로\" 꼴로"
+    if (s ~ /^[[:space:]]*(-[[:space:]]*)?\?/) print NR "번째 줄: ? 로 시작하는 키(명시적 키 문법)"
     if (s ~ /^ *[A-Za-z0-9_.-]+[[:space:]]*:([[:space:]]|$)/) {
       match(s, /^ */); ind = RLENGTH; key = substr(s, ind + 1); sub(/[[:space:]]*:.*/, "", key)
       while (n > 0 && st[n] >= ind) n--
       if (n == 0) top = key
       if (n == 0 && index(oktop, " " key " ") == 0) print NR "번째 줄: 맨 위에 허용 안 된 설정 " key
+      if (n == 1 && key !~ /^[a-z0-9][a-z0-9_-]*$/) print NR "번째 줄: 서비스·볼륨 이름은 영문 소문자·숫자·_·- 만(" key ")"
       if (n == 2 && top == "services" && index(oksvc, " " key " ") == 0) print NR "번째 줄: 서비스에 허용 안 된 설정 " key
       if (n == 2 && top == "volumes") print NR "번째 줄: 이름 붙은 볼륨은 이름만(" key " 금지)"
       st[++n] = ind
@@ -77,6 +79,8 @@ yaml_flat() {
     if (!match(s, /^("[^"]*"|[^:"[:space:]][^:"]*):( |$)/)) { print "!PARSE\t" s; return }
     k = unq(substr(s, 1, RLENGTH - (substr(s, RLENGTH, 1) == " " ? 2 : 1))); v = unq(substr(s, RLENGTH + 1))
     popto(i, 0)
+    # 맨 위·서비스 이름·서비스 설정 자리(깊이 0~2)의 키에 점·괄호가 있으면 경로가 섞인다(서비스 "db.x" + privileged → db 의 x 처럼 보임) → 거부
+    if (n < 3 && k !~ /^[A-Za-z0-9_-]+$/) { print "!KEY\t" k; return }
     if (v == "") { nm[++n] = k; ix[n] = i; return }
     if (v ~ /^[|>][-+]?[0-9]?$/) { print path() (n ? "." : "") k "\t(block)"; blk = i; return }
     if (v ~ /^[[{]/ && v != "{}" && v != "[]") { print "!FLOW\t" path() "." k; return }
@@ -87,6 +91,7 @@ yaml_flat() {
     match($0, /^ */); i = RLENGTH; s = substr($0, i + 1)
     if (blk >= 0) { if (s == "" || i > blk) next; blk = -1 }
     if (s == "" || s ~ /^#/) next
+    if (s ~ /^(-[[:space:]]+)?\?/) { print "!PARSE\t" s; next }   # ? 명시적 키 문법은 읽지 않음
     if (s ~ /^-( |$)/) {
       popto(i, 1); p = path(); idx = c[p]++
       nm[++n] = "[" idx "]"; ix[n] = i
@@ -103,7 +108,8 @@ yaml_flat() {
 resolved_check() {
   awk -F'\t' -v allow="$(allowed_full)" '
   BEGIN { al = "\n" allow "\n"
-    deny = " privileged cap_add devices device_cgroup_rules network_mode pid ipc uts userns_mode cgroup cgroup_parent runtime isolation sysctls volumes_from build develop env_file configs secrets gpus storage_opt credential_spec "
+    # 금지 목록이 아니라 허용 목록: 원본 허용 설정(src_check oksvc) + compose가 붙이는 networks. 모르는 설정은 다 거부(모르면 막기)
+    oksvc = " image environment ports volumes healthcheck mem_limit cpus pids_limit security_opt depends_on command working_dir read_only tmpfs expose labels networks "
   }
   /^!/ { print "해석 결과를 읽지 못함(" $1 " " $2 ")"; next }
   {
@@ -116,7 +122,8 @@ resolved_check() {
     if (!match(p, /^services\.[^.[]+/)) { print "이상한 서비스 경로: " p; next }
     svc = substr(p, 1, RLENGTH); rest = substr(p, RLENGTH + 2); key = rest; sub(/[.[].*/, "", key)
     seen[svc] = 1
-    if (index(deny, " " key " ")) { print svc ": 금지된 설정 " key; next }
+    if (svc !~ /^services\.[a-z0-9][a-z0-9_-]*$/) { print "서비스 이름이 이상함: " svc; next }
+    if (index(oksvc, " " key " ") == 0) { print svc ": 허용 안 된 설정 " key; next }
     if (key == "image") { img[svc] = 1; if (index(al, "\n" v "\n") == 0) print svc ": 허용 목록과 다른 이미지 " v }
     if (key == "user" && (v ~ /^(root|0)(:.*)?$/)) print svc ": root로 실행"
     if (key == "security_opt" && v !~ /^no-new-privileges([:=]true)?$/) print svc ": security_opt 는 no-new-privileges 만 (" v ")"
@@ -305,17 +312,31 @@ up|down)
     resolved="$(docker compose -p "ai-$APP" -f "$APPHOST/compose.yaml" "${envarg[@]}" config 2>/dev/null)" \
       || die 1 "compose.yaml 해석 실패 — 'docker compose config' 오류(문법·변수 확인)"
     rb="$(printf '%s\n' "$resolved" | yaml_flat | resolved_check)"
+    # bind 원본: 있어야 하고, 실제 위치가 앱 안이고, 앱 폴더까지 올라가는 길에 바로가기(정션)가 하나도 없어야(바꿔치기 줄이기)
+    bind_bad() {
+      local src="$1" p="$1" r d
+      command -v cygpath >/dev/null 2>&1 && p="$(cygpath -u -- "$src" 2>/dev/null || printf '%s' "$src")"
+      [ -e "$p" ] || { echo "볼륨 원본 경로가 없음(먼저 만드세요): $src"; return; }
+      r="$(readlink -f -- "$p" 2>/dev/null)"
+      case "$r/" in "$APPABS"/*) ;; *) echo "해석된 볼륨이 앱 폴더 밖을 연결: $src"; return ;; esac
+      d="$p"
+      while [ "$(readlink -f -- "$d" 2>/dev/null)" != "$APPABS" ]; do
+        [ -L "$d" ] && { echo "볼륨 원본 길에 바로가기가 있음: $src"; return; }
+        case "$d" in /|.|"") echo "볼륨 원본이 앱 폴더 아래가 아님: $src"; return ;; esac
+        d="$(dirname -- "$d")"
+      done
+    }
+    binds=()
     while IFS= read -r line; do
       case "$line" in
-        BIND$'\t'*) src="${line#BIND$'\t'}"; p="$src"
-          command -v cygpath >/dev/null 2>&1 && p="$(cygpath -u -- "$src" 2>/dev/null || printf '%s' "$src")"
-          r="$(readlink -f -- "$p" 2>/dev/null)"
-          [ -e "$p" ] || { bad="$bad 볼륨 원본 경로가 없음(먼저 만드세요): $src;"; continue; }
-          case "$r/" in "$APPABS"/*) ;; *) bad="$bad 해석된 볼륨이 앱 폴더 밖을 연결: $src;" ;; esac ;;
+        BIND$'\t'*) src="${line#BIND$'\t'}"; binds+=("$src"); m="$(bind_bad "$src")"; [ -n "$m" ] && bad="$bad $m;" ;;
         ?*) bad="$bad $line;" ;;
       esac
     done <<< "$rb"
     [ -z "$bad" ] || deny "compose 해석 결과 검사 실패:$bad"
+    # 띄우기 바로 직전에 앱 폴더·bind 원본을 한 번 더(그 사이 바꿔치기 막기). 남은 틈: 이 줄과 Docker가 경로를 여는 사이의 아주 짧은 순간
+    app_safe
+    for src in "${binds[@]}"; do m="$(bind_bad "$src")"; [ -n "$m" ] && deny "띄우기 직전 다시 본 결과: $m"; done
     printf '%s\n' "$resolved" | docker compose -p "ai-$APP" --project-directory "$APPHOST" -f - up -d --wait "$@"
   else
     need_docker

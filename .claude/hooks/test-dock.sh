@@ -97,6 +97,7 @@ row "up: compose.yaml 없음 → 거부(2)" 2 "$(rc K --dry-run up apps/shop)"
 # ---- up: Docker가 해석한 결과 검사 (가짜 docker가 compose config 출력을 흉내) ----
 mkdir -p apps/shop/seed outside
 win() { cygpath -w "$1" 2>/dev/null || printf '%s' "$1"; }
+mkln() { if command -v cmd >/dev/null 2>&1 && command -v cygpath >/dev/null 2>&1; then MSYS2_ARG_CONV_EXCL='*' cmd /c mklink /J "$(cygpath -w "$1")" "$(cygpath -w "$2")" >/dev/null 2>&1; else ln -s "$2" "$1"; fi; }
 SEED="$(win "$tmp/apps/shop/seed")"
 cat > fakebin/docker <<'EOF'
 #!/usr/bin/env bash
@@ -161,11 +162,18 @@ row "해석: 볼륨 종류 image → 거부(2)" 2 "$(rbad 's/type: volume/type: 
 row "해석: 이름 붙은 볼륨에 driver_opts → 거부(2)" 2 "$(rbad 's/    name: ai-shop_dbdata/    driver_opts:\n      device: \/etc\n    name: ai-shop_dbdata/')"
 row "해석: 모르는 흐름 문법 → 거부(2)" 2 "$(rbad 's/default: null/default: {aliases: [x]}/')"
 row "해석: 맨 위 secrets → 거부(2)" 2 "$(rbad 's/^networks:/secrets:\n  s:\n    file: \/etc\/passwd\nnetworks:/')"
+row "해석: 점 든 서비스 이름(db.x — 경로 섞기) → 거부(2)" 2 "$(rbad 's/^  db:/  db.x:/')"
+row "해석: 예전 금지 목록에 없던 설정(oom_kill_disable) → 거부(2)" 2 "$(rbad 's/^    image:/    oom_kill_disable: true\n    image:/')"
+row "해석: ? 명시적 키 → 거부(2)" 2 "$(rbad 's/^    image:/    ? privileged\n    : true\n    image:/')"
+mkln apps/shop/seedlink "$tmp/apps/shop/seed"
+row "해석: bind 원본 길에 바로가기(안쪽을 가리켜도) → 거부(2)" 2 "$(rbad "s#source: .*seed#source: $(win "$tmp/apps/shop/seedlink" | sed 's/\\/\\\\/g')#")"
+rm -f apps/shop/seedlink 2>/dev/null
+row "원본: 점 든 서비스 이름 → 거부(2)" 2 "$(bad 's/^  db:/  db.x:/')"
+row "원본: ? 명시적 키 → 거부(2)" 2 "$(bad 's/^    image:/    ? privileged\n    : true\n    image:/')"
 row "해석 실패 메시지에 비밀값이 안 나옴" 없음 "$(good; rcfg; sed -i.bak 's/^    image:/    privileged: true\n    image:/' "$FAKE_CFG"; FD up apps/shop 2>&1 | grep -qF hunter2 && echo 있음 || echo 없음)"
 rm -f apps/shop/compose.yaml
 
 # ---- 바로가기·정션 ----
-mkln() { if command -v cmd >/dev/null 2>&1 && command -v cygpath >/dev/null 2>&1; then MSYS2_ARG_CONV_EXCL='*' cmd /c mklink /J "$(cygpath -w "$1")" "$(cygpath -w "$2")" >/dev/null 2>&1; else ln -s "$2" "$1"; fi; }
 mkln apps/shop/in-link "$tmp/apps/shop/seed"
 row "앱 안을 가리키는 바로가기(node_modules/.bin 같은) → 통과" 0 "$(rc K --dry-run run apps/shop node -- sh)"
 mkln apps/shop/out-link "$tmp/outside"
