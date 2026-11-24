@@ -58,6 +58,9 @@ Docker는 **"모든 걸 컨테이너로"가 아니라, 직접 설치하면 아�
 - **네트워크**: 기본은 그 앱 compose 안에서만. 패키지 내려받기가 필요한 단계만 바깥 허용, 레드팀 대상은 바깥 차단
 - **비밀값**: 이미지·compose 파일에 쓰지 않음. `apps/<앱>/.env`(커밋 안 함)에서 실행 때만 넣음. 기존 guard-git 비밀값 검사를 compose·Dockerfile에도
 - **훅**: Claude·에이전트가 `docker …`를 직접 치면 막고 "`dock.sh`로" 안내(guard-git과 같은 자리)
+  - `guard-docker.sh`는 **과속 방지턱**이다. 명령 글자만 보므로 스크립트 파일 안·더 교묘한 셸 꼴은 못 본다(이름 가운데 따옴표·역슬래시 섞기 `d"o"cker`·`doc\ker`는 2026-11-24부터 막음). **진짜 방어는 `dock.sh` 정책 검사**다.
+- **compose는 두 번 본다**(2026-11-24): ① 원본 파일 — 허용된 설정 이름만(서비스: image·environment·ports·volumes·healthcheck·mem_limit·cpus·pids_limit·security_opt·depends_on·command·working_dir·read_only·tmpfs·expose·labels, 맨 위: services·volumes), 흐름 문법(`{ }` `[ ]`, `${변수}`는 제외)·따옴표 키·탭·`type:`/`source:` 줄 거부 ② **Docker가 해석한 결과**(`docker compose config`) — 모든 볼륨은 volume·bind·tmpfs이고 bind는 실제 위치가 앱 폴더 안, 모든 포트 `host_ip: 127.0.0.1`, privileged·cap_add·devices·network_mode·pid·ipc 등 없음, security_opt는 no-new-privileges만, user root 아님, 이미지는 허용 목록과 같음, 이름 붙은 볼륨·네트워크는 이름만. 그리고 **검사한 그 결과 그대로를 표준 입력으로 `up`에 넘긴다**(검사 뒤 파일 바꿔치기 막기). 실제 Docker 출력으로는 2단계(설치) 뒤 확인
+- **바로가기**: `apps/` 자체·앱 폴더가 바로가기면 거부, 앱 폴더 안 바로가기·NTFS 정션은 앱 밖(또는 없는 곳)을 가리키면 거부(안쪽끼리는 허용 — `node_modules/.bin`). `dock.sh` 시작 때와 `docker` 실행 바로 직전에 두 번 본다
 
 ## 5. 그래프와 연결
 - **opt(설계안)**: 앱마다 `실행 환경: docker|직접`과 DB 여부를 정한다(설계안 점수표에 "다른 컴퓨터에서 바로 됨" 항목). 사장이 ★ok-opt에서 고름

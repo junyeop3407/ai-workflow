@@ -82,8 +82,101 @@ row "up: build: (직접 이미지 만들기) → 거부(2)" 2 "$(bad 's/^    ima
 row "up: network_mode: host → 거부(2)" 2 "$(bad 's/^    image:/    network_mode: host\n    image:/')"
 row "up: YAML 앵커(&x) → 거부(2)" 2 "$(bad 's/^  db:/  db: \&base/')"
 row "up: seccomp 끄기 → 거부(2)" 2 "$(bad 's/^    image:/    security_opt: [seccomp:unconfined]\n    image:/')"
+# 원본 파일: 허용된 설정 이름만·흐름 문법·따옴표 키·긴 볼륨 문법 금지
+row "up: 서비스에 env_file(허용 목록 밖) → 거부(2)" 2 "$(bad 's/^    image:/    env_file: ..\/..\/secret\n    image:/')"
+row "up: 긴 볼륨 문법(type:/source:) → 거부(2)" 2 "$(bad 's#      - ./seed:/docker-entrypoint-initdb.d#      - type: bind\n        source: /etc\n        target: /x#')"
+row "up: 흐름 문법(healthcheck test: [...]) → 거부(2)" 2 "$(bad 's/^    image:/    healthcheck:\n      test: [\"CMD\", \"true\"]\n    image:/')"
+row "up: 따옴표 붙은 키(\"privileged\": true) → 거부(2)" 2 "$(bad 's/^    image:/    \"privileged\": true\n    image:/')"
+row "up: 맨 위 x-공통 설정 → 거부(2)" 2 "$(bad 's/^services:/x-common:\n  a: 1\nservices:/')"
+row "up: 이름 붙은 볼륨에 driver_opts(내 폴더 연결) → 거부(2)" 2 "$(bad 's/^  dbdata:/  dbdata:\n    driver_opts:\n      device: \/etc/')"
+row "up: 서비스 이름 자리에 옵션(--build) → 거부(2)" 2 "$(good; rc K --dry-run up apps/shop --build)"
+row "up 미리보기: 해석(config) → 그 결과를 표준 입력으로(-f -)" 있음 "$(good; K --dry-run up apps/shop 2>&1 | grep -qF -- "config" && K --dry-run up apps/shop 2>&1 | grep -qF -- "-f - up" && echo 있음 || echo 없음)"
 rm apps/shop/compose.yaml
 row "up: compose.yaml 없음 → 거부(2)" 2 "$(rc K --dry-run up apps/shop)"
+
+# ---- up: Docker가 해석한 결과 검사 (가짜 docker가 compose config 출력을 흉내) ----
+mkdir -p apps/shop/seed outside
+win() { cygpath -w "$1" 2>/dev/null || printf '%s' "$1"; }
+SEED="$(win "$tmp/apps/shop/seed")"
+cat > fakebin/docker <<'EOF'
+#!/usr/bin/env bash
+case "$*" in
+  "info") exit 0 ;;
+  *compose*" config"*) cat "$FAKE_CFG" ;;
+  *compose*" up "*) cat > "$FAKE_UPIN" ;;
+  *) exit 0 ;;
+esac
+EOF
+chmod +x fakebin/docker
+export FAKE_CFG="$tmp/cfg.yaml" FAKE_UPIN="$tmp/upin.yaml"
+rcfg() { cat > "$FAKE_CFG" <<EOF
+name: ai-shop
+services:
+  db:
+    environment:
+      POSTGRES_PASSWORD: hunter2
+    image: postgres:17@$D1
+    networks:
+      default: null
+    ports:
+      - mode: ingress
+        host_ip: 127.0.0.1
+        target: 5432
+        published: "55432"
+        protocol: tcp
+    security_opt:
+      - no-new-privileges:true
+    volumes:
+      - type: volume
+        source: dbdata
+        target: /var/lib/postgresql/data
+        volume: {}
+      - type: bind
+        source: $SEED
+        target: /docker-entrypoint-initdb.d
+        bind:
+          create_host_path: true
+networks:
+  default:
+    name: ai-shop_default
+volumes:
+  dbdata:
+    name: ai-shop_dbdata
+EOF
+}
+FD() { PATH="$tmp/fakebin:$PATH" K "$@"; }
+rbad() { good; rcfg; sed -i.bak "$1" "$FAKE_CFG"; rm -f "$FAKE_CFG.bak"; FD up apps/shop >/dev/null 2>&1; echo $?; }
+good; rcfg; rm -f "$FAKE_UPIN"
+row "해석: 규칙에 맞는 결과 → 띄움(0)" 0 "$(FD up apps/shop >/dev/null 2>&1; echo $?)"
+row "해석: 검사한 결과 그대로를 up 에 넘김" 같음 "$(cmp -s "$FAKE_CFG" "$FAKE_UPIN" && echo 같음 || echo 다름)"
+row "해석: bind 원본이 앱 폴더 밖(원본은 통과) → 거부(2)" 2 "$(rbad "s#source: .*seed#source: $(win "$tmp/outside" | sed 's/\\/\\\\/g')#")"
+row "해석: 포트가 0.0.0.0 → 거부(2)" 2 "$(rbad 's/host_ip: 127.0.0.1/host_ip: 0.0.0.0/')"
+row "해석: 포트에 host_ip 없음(모든 주소) → 거부(2)" 2 "$(rbad '/host_ip: 127.0.0.1/d')"
+row "해석: privileged → 거부(2)" 2 "$(rbad 's/^    image:/    privileged: true\n    image:/')"
+row "해석: cap_add → 거부(2)" 2 "$(rbad 's/^    image:/    cap_add:\n      - SYS_ADMIN\n    image:/')"
+row "해석: 이미지가 허용 목록과 다름 → 거부(2)" 2 "$(rbad "s#postgres:17@$D1#postgres:17#")"
+row "해석: user root → 거부(2)" 2 "$(rbad 's/^    image:/    user: \"0:0\"\n    image:/')"
+row "해석: security_opt seccomp 끄기 → 거부(2)" 2 "$(rbad 's/no-new-privileges:true/seccomp=unconfined/')"
+row "해석: 볼륨 종류 image → 거부(2)" 2 "$(rbad 's/type: volume/type: image/')"
+row "해석: 이름 붙은 볼륨에 driver_opts → 거부(2)" 2 "$(rbad 's/    name: ai-shop_dbdata/    driver_opts:\n      device: \/etc\n    name: ai-shop_dbdata/')"
+row "해석: 모르는 흐름 문법 → 거부(2)" 2 "$(rbad 's/default: null/default: {aliases: [x]}/')"
+row "해석: 맨 위 secrets → 거부(2)" 2 "$(rbad 's/^networks:/secrets:\n  s:\n    file: \/etc\/passwd\nnetworks:/')"
+row "해석 실패 메시지에 비밀값이 안 나옴" 없음 "$(good; rcfg; sed -i.bak 's/^    image:/    privileged: true\n    image:/' "$FAKE_CFG"; FD up apps/shop 2>&1 | grep -qF hunter2 && echo 있음 || echo 없음)"
+rm -f apps/shop/compose.yaml
+
+# ---- 바로가기·정션 ----
+mkln() { if command -v cmd >/dev/null 2>&1 && command -v cygpath >/dev/null 2>&1; then MSYS2_ARG_CONV_EXCL='*' cmd /c mklink /J "$(cygpath -w "$1")" "$(cygpath -w "$2")" >/dev/null 2>&1; else ln -s "$2" "$1"; fi; }
+mkln apps/shop/in-link "$tmp/apps/shop/seed"
+row "앱 안을 가리키는 바로가기(node_modules/.bin 같은) → 통과" 0 "$(rc K --dry-run run apps/shop node -- sh)"
+mkln apps/shop/out-link "$tmp/outside"
+row "앱 밖을 가리키는 바로가기·정션 → 거부(2)" 2 "$(rc K --dry-run run apps/shop node -- sh)"
+rm -f apps/shop/out-link apps/shop/in-link 2>/dev/null
+[ -e apps/shop/out-link ] && MSYS2_ARG_CONV_EXCL='*' cmd /c rmdir "$(cygpath -w "$tmp/apps/shop/out-link")" >/dev/null 2>&1
+row "바로가기를 치운 뒤 → 통과" 0 "$(rc K --dry-run run apps/shop node -- sh)"
+mv apps realapps && mkln apps "$tmp/realapps"
+row "apps/ 폴더 자체가 바로가기 → 거부(2)" 2 "$(rc K --dry-run run apps/shop node -- sh)"
+rm -rf apps 2>/dev/null; [ -e apps ] || mv realapps apps
+rm -f fakebin/docker; unset FAKE_CFG FAKE_UPIN
 
 # ---- check·pin: Docker 없음 / 가짜 docker ----
 nodock="$tmp/fakebin:$(dirname "$(command -v git)"):$(dirname "$(command -v awk)"):/usr/bin:/bin"   # git·awk는 두고 docker만 없는 PATH

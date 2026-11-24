@@ -41,18 +41,129 @@ img_dig()  { img_line "$1" | awk '{ print $3 }'; }
 img_user() { img_line "$1" | awk '{ print $4 }'; }
 allowed_full() { awk '!/^#/ && NF>=4 && $3 ~ /^sha256:[0-9a-f]{64}$/ { print $2 "@" $3 }' "$IMAGES"; }
 
+# ---- compose 검사 (yq·jq 없이 awk) ----
+# 원본 compose.yaml: 맨 위는 services·volumes, 서비스 설정은 아래 목록만, 이름 붙은 볼륨은 이름만(driver_opts로 내 폴더 연결 막기).
+# 흐름 문법({ } [ ] — ${변수}는 제외)·따옴표 붙은 키·탭·type:/source:(긴 볼륨 문법) 줄은 거부. 문제마다 한 줄.
+src_check() {
+  awk -v q="'" '
+  BEGIN { oksvc=" image environment ports volumes healthcheck mem_limit cpus pids_limit security_opt depends_on command working_dir read_only tmpfs expose labels "; oktop=" services volumes " }
+  /^[[:space:]]*#/ || /^[[:space:]]*$/ { next }
+  /\t/ { print NR "번째 줄: 탭 문자"; next }
+  {
+    s = $0; gsub(/\$\{[A-Za-z0-9_:?+=-]*\}/, "", s); sub(/[[:space:]]+#.*$/, "", s)
+    if (s ~ /[][{}]/) print NR "번째 줄: 흐름 문법({ } [ ]) 대신 줄 바꿈 목록으로"
+    if (s ~ /^[[:space:]]*(-[[:space:]]*)?"[^"]*"[[:space:]]*:/ || s ~ ("^[[:space:]]*(-[[:space:]]*)?" q "[^" q "]*" q "[[:space:]]*:")) print NR "번째 줄: 따옴표 붙은 키"
+    if (s ~ /^[[:space:]]*(-[[:space:]]*)?(type|source)[[:space:]]*:/) print NR "번째 줄: type:/source:(긴 볼륨 문법) 대신 \"이름:/경로\" 꼴로"
+    if (s ~ /^ *[A-Za-z0-9_.-]+[[:space:]]*:([[:space:]]|$)/) {
+      match(s, /^ */); ind = RLENGTH; key = substr(s, ind + 1); sub(/[[:space:]]*:.*/, "", key)
+      while (n > 0 && st[n] >= ind) n--
+      if (n == 0) top = key
+      if (n == 0 && index(oktop, " " key " ") == 0) print NR "번째 줄: 맨 위에 허용 안 된 설정 " key
+      if (n == 2 && top == "services" && index(oksvc, " " key " ") == 0) print NR "번째 줄: 서비스에 허용 안 된 설정 " key
+      if (n == 2 && top == "volumes") print NR "번째 줄: 이름 붙은 볼륨은 이름만(" key " 금지)"
+      st[++n] = ind
+    }
+  }' "$1"
+}
+# 블록 문법 YAML(docker compose config 출력)을 "경로<탭>값" 줄로 편다. 예: services.db.ports[0].host_ip	127.0.0.1
+# 모르는 꼴은 !PARSE, 빈 것이 아닌 흐름 문법은 !FLOW 로 내보내 거부되게 한다(모르면 막기).
+yaml_flat() {
+  awk -v q="'" '
+  function unq(v) { sub(/^[[:space:]]+/, "", v); sub(/[[:space:]]+$/, "", v)
+    if (v ~ /^".*"$/ || v ~ ("^" q ".*" q "$")) v = substr(v, 2, length(v) - 2); return v }
+  function path(  p, i) { p = ""; for (i = 1; i <= n; i++) p = p ((i > 1 && nm[i] !~ /^\[/) ? "." : "") nm[i]; return p }
+  function popto(i, item) { while (n > 0 && (ix[n] > i || (ix[n] == i && (!item || nm[n] ~ /^\[/)))) n-- }
+  function keyline(s, i,   k, v) {
+    if (!match(s, /^("[^"]*"|[^:"[:space:]][^:"]*):( |$)/)) { print "!PARSE\t" s; return }
+    k = unq(substr(s, 1, RLENGTH - (substr(s, RLENGTH, 1) == " " ? 2 : 1))); v = unq(substr(s, RLENGTH + 1))
+    popto(i, 0)
+    if (v == "") { nm[++n] = k; ix[n] = i; return }
+    if (v ~ /^[|>][-+]?[0-9]?$/) { print path() (n ? "." : "") k "\t(block)"; blk = i; return }
+    if (v ~ /^[[{]/ && v != "{}" && v != "[]") { print "!FLOW\t" path() "." k; return }
+    print path() (n ? "." : "") k "\t" v
+  }
+  BEGIN { blk = -1 }
+  {
+    match($0, /^ */); i = RLENGTH; s = substr($0, i + 1)
+    if (blk >= 0) { if (s == "" || i > blk) next; blk = -1 }
+    if (s == "" || s ~ /^#/) next
+    if (s ~ /^-( |$)/) {
+      popto(i, 1); p = path(); idx = c[p]++
+      nm[++n] = "[" idx "]"; ix[n] = i
+      r = s; sub(/^-[[:space:]]*/, "", r)
+      if (r == "") next
+      if (r ~ /^("[^"]*"|[^:"[:space:]][^:"]*):( |$)/) { keyline(r, i + 2) }
+      else { n--; v = unq(r); if (v ~ /^[[{]/ && v != "{}" && v != "[]") print "!FLOW\t" p; else print p "[" idx "]\t" v }
+      next
+    }
+    keyline(s, i)
+  }'
+}
+# 편 결과를 검사. 문제는 한 줄씩, bind 볼륨 원본은 "BIND<탭>경로"로 내보내 셸이 실제 위치를 따라가 본다.
+resolved_check() {
+  awk -F'\t' -v allow="$(allowed_full)" '
+  BEGIN { al = "\n" allow "\n"
+    deny = " privileged cap_add devices device_cgroup_rules network_mode pid ipc uts userns_mode cgroup cgroup_parent runtime isolation sysctls volumes_from build develop env_file configs secrets gpus storage_opt credential_spec "
+  }
+  /^!/ { print "해석 결과를 읽지 못함(" $1 " " $2 ")"; next }
+  {
+    p = $1; v = $2; top = p; sub(/[.[].*/, "", top)
+    if (top !~ /^(name|services|volumes|networks)$/) { print "맨 위에 허용 안 된 설정: " top; next }
+    if (top == "volumes" || top == "networks") {
+      if (p ~ /^(volumes|networks)\.[^.]+$/) next
+      k = p; sub(/^[^.]+\.[^.]+\./, "", k); if (k != "name") print top " 설정은 이름만(" p ")"; next }
+    if (top != "services") next
+    if (!match(p, /^services\.[^.[]+/)) { print "이상한 서비스 경로: " p; next }
+    svc = substr(p, 1, RLENGTH); rest = substr(p, RLENGTH + 2); key = rest; sub(/[.[].*/, "", key)
+    seen[svc] = 1
+    if (index(deny, " " key " ")) { print svc ": 금지된 설정 " key; next }
+    if (key == "image") { img[svc] = 1; if (index(al, "\n" v "\n") == 0) print svc ": 허용 목록과 다른 이미지 " v }
+    if (key == "user" && (v ~ /^(root|0)(:.*)?$/)) print svc ": root로 실행"
+    if (key == "security_opt" && v !~ /^no-new-privileges([:=]true)?$/) print svc ": security_opt 는 no-new-privileges 만 (" v ")"
+    if (match(rest, /^ports\[[0-9]+\]/)) { pi = svc "." substr(rest, 1, RLENGTH); port[pi] = 1; if (rest ~ /\.host_ip$/ && v == "127.0.0.1") lo[pi] = 1 }
+    if (match(rest, /^volumes\[[0-9]+\]/)) { vi = svc "." substr(rest, 1, RLENGTH); vol[vi] = 1
+      if (rest ~ /\]\.type$/) { vt[vi] = v; if (v !~ /^(volume|bind|tmpfs)$/) print vi ": 볼륨 종류 " v " 금지" }
+      if (rest ~ /\]\.source$/) vs[vi] = v }
+  }
+  END {
+    for (s in seen) if (!(s in img)) print s ": image 없음"
+    for (x in port) if (!(x in lo)) print x ": 포트는 127.0.0.1 에만"
+    for (x in vol) { if (!(x in vt)) print x ": 볼륨 종류를 알 수 없음"
+      else if (vt[x] == "bind") { if (vs[x] == "") print x ": bind 원본 없음"; else print "BIND\t" vs[x] } }
+  }'
+}
+
 # ---- 앱 폴더 ----
 app_dir() { # apps/<앱> → 확인된 앱 이름
   local a="${1%/}"; a="${a#apps/}"
   printf '%s' "$a" | grep -Eq '^[a-z0-9][a-z0-9-]*$' || deny "앱 이름은 영문 소문자·숫자·하이픈만: $1"
   [ -d "$ROOT/apps/$a" ] || deny "앱 폴더가 없습니다: apps/$a"
-  [ -L "$ROOT/apps/$a" ] && deny "앱 폴더가 바로가기(symlink)입니다 — 다른 곳을 연결할 수 있어 거부: apps/$a"
-  # 실제 경로(바로가기를 따라간 끝)가 저장소의 apps/ 바로 아래여야
-  local real base; real="$(cd "$ROOT/apps/$a" && pwd -P)"; base="$(cd "$ROOT/apps" && pwd -P)"
-  [ "$real" = "$base/$a" ] || deny "앱 폴더의 실제 위치가 저장소 apps/ 밖입니다: $real"
-  APP="$a"; APPABS="$real"
+  APP="$a"; app_safe
   # Windows: docker에 넘길 경로는 C:/… 꼴
   if (cd "$APPABS" && pwd -W) >/dev/null 2>&1; then APPHOST="$(cd "$APPABS" && pwd -W)"; else APPHOST="$APPABS"; fi
+}
+# 앱 폴더가 정말 저장소 apps/<앱> 인지 + 안쪽에 밖을 가리키는 바로가기가 없는지. app_dir 때와 docker 실행 바로 직전에 두 번 본다.
+app_safe() {
+  local a="$APP" rroot real
+  [ -L "$ROOT/apps" ] && deny "apps/ 폴더 자체가 바로가기(symlink)입니다 — 다른 곳을 연결할 수 있어 거부"
+  [ -L "$ROOT/apps/$a" ] && deny "앱 폴더가 바로가기(symlink)입니다 — 다른 곳을 연결할 수 있어 거부: apps/$a"
+  # 실제 경로(바로가기를 따라간 끝)가 저장소의 실제 위치 + /apps/<앱> 이어야
+  rroot="$(cd "$ROOT" && pwd -P)"; real="$(cd "$ROOT/apps/$a" 2>/dev/null && pwd -P)"
+  [ -n "$real" ] && [ "$real" = "$rroot/apps/$a" ] || deny "앱 폴더의 실제 위치가 저장소 apps/ 밖입니다: ${real:-알 수 없음}"
+  APPABS="$real"
+  # 안쪽 바로가기: 앱 폴더 안을 가리키면 괜찮다(node_modules/.bin 등). 밖·없는 곳을 가리키면 거부(compose ./볼륨·.env·compose.yaml이
+  # 내 컴퓨터의 다른 곳을 열 수 있음). Git Bash는 NTFS 정션도 바로가기로 보이고, Windows는 dir /AL 로 한 번 더 찾는다.
+  local links l t
+  links="$(find "$APPABS" -type l 2>/dev/null)"
+  if command -v cmd >/dev/null 2>&1 && command -v cygpath >/dev/null 2>&1; then
+    links="$links
+$(MSYS2_ARG_CONV_EXCL='*' cmd /c dir /AL /S /B "$(cygpath -w "$APPABS")" 2>/dev/null | tr -d '\r' | grep -E '^[A-Za-z]:\\' | while IFS= read -r l; do cygpath -u "$l"; done)"
+  fi
+  while IFS= read -r l; do
+    [ -n "$l" ] || continue
+    t="$(readlink -f -- "$l" 2>/dev/null)"
+    case "$t/" in "$APPABS"/*) ;; *) deny "앱 폴더 안에 밖(또는 없는 곳)을 가리키는 바로가기·정션이 있습니다: ${l#"$APPABS"/} → ${t:-?} — 지우거나 실제 파일로 바꾸세요" ;; esac
+  done <<< "$links"
 }
 
 cmd="$1"; shift 2>/dev/null
@@ -129,6 +240,7 @@ run)
   args+=("$(img_ref "$alias")@$dg" "$@")   # 이름:태그@다이제스트 (다이제스트가 우선 — 태그는 사람이 읽기용)
   if [ $DRY = 1 ]; then printf '[미리보기]%s ' "${locks:+ (잠금 $locks)}"; show docker "${args[@]}"; exit 0; fi
   need_docker
+  app_safe   # 실행 바로 직전에 한 번 더(그 사이 바로가기로 바꿔치기 막기)
   runit() {
     docker "${args[@]}" & local dp=$!
     ( sleep "$tmo"; docker kill "$name" >/dev/null 2>&1 && echo "dock.sh: ${tmo}초 시간 초과로 멈춤 ($name)" >&2 ) & local wp=$!
@@ -176,10 +288,35 @@ up|down)
     done < <(awk '/^[[:space:]]+volumes:/{f=1; next} f && /^[[:space:]]+-/{ sub(/^[[:space:]]*-[[:space:]]*/, ""); print; next } f && !/^[[:space:]]+-/{ f=0 }' "$f")
     # 비밀값: 비밀번호·키 값은 ${변수}(앱 폴더 .env, 커밋 안 함)로만
     grep -nE '^[[:space:]]*-?[[:space:]]*[A-Z0-9_]*(PASSWORD|PASSWD|SECRET|TOKEN|API_KEY|PRIVATE_KEY)[A-Z0-9_]*[[:space:]]*[:=][[:space:]]*[^$[:space:]]' "$f" | grep -q . && bad="$bad 비밀값을 파일에 직접 씀(\${변수}로, 값은 apps/$APP/.env);"
+    # 원본 파일: 허용된 설정 이름만, 흐름 문법·따옴표 키·긴 볼륨 문법 금지(숨은 설정을 줄 검사가 못 보는 길을 닫음)
+    sb="$(src_check "$f" | head -n 5 | paste -sd';' -)"; [ -n "$sb" ] && bad="$bad $sb;"
     [ -z "$bad" ] || deny "compose.yaml 검사 실패:$bad"
-    need_docker
+    for s in "$@"; do printf '%s' "$s" | grep -Eq '^[a-z0-9][a-z0-9_-]*$' || deny "서비스 이름만 넘길 수 있습니다: $s"; done
     envarg=(); [ -f "$APPABS/.env" ] && envarg=(--env-file "$APPHOST/.env")
-    dk compose -p "ai-$APP" -f "$APPHOST/compose.yaml" "${envarg[@]}" up -d --wait "$@"
+    if [ $DRY = 1 ]; then
+      dk compose -p "ai-$APP" -f "$APPHOST/compose.yaml" "${envarg[@]}" config
+      echo "[미리보기] (위 해석 결과를 검사한 뒤, 그 결과 그대로를 표준 입력으로)"
+      dk compose -p "ai-$APP" --project-directory "$APPHOST" -f - up -d --wait "$@"
+      exit 0
+    fi
+    need_docker
+    app_safe
+    # Docker가 해석한 결과(변수·짧은 문법·상대 경로를 다 푼 것)를 검사하고, 검사한 그 글자 그대로 띄운다(검사 뒤 파일 바꿔치기 막기)
+    resolved="$(docker compose -p "ai-$APP" -f "$APPHOST/compose.yaml" "${envarg[@]}" config 2>/dev/null)" \
+      || die 1 "compose.yaml 해석 실패 — 'docker compose config' 오류(문법·변수 확인)"
+    rb="$(printf '%s\n' "$resolved" | yaml_flat | resolved_check)"
+    while IFS= read -r line; do
+      case "$line" in
+        BIND$'\t'*) src="${line#BIND$'\t'}"; p="$src"
+          command -v cygpath >/dev/null 2>&1 && p="$(cygpath -u -- "$src" 2>/dev/null || printf '%s' "$src")"
+          r="$(readlink -f -- "$p" 2>/dev/null)"
+          [ -e "$p" ] || { bad="$bad 볼륨 원본 경로가 없음(먼저 만드세요): $src;"; continue; }
+          case "$r/" in "$APPABS"/*) ;; *) bad="$bad 해석된 볼륨이 앱 폴더 밖을 연결: $src;" ;; esac ;;
+        ?*) bad="$bad $line;" ;;
+      esac
+    done <<< "$rb"
+    [ -z "$bad" ] || deny "compose 해석 결과 검사 실패:$bad"
+    printf '%s\n' "$resolved" | docker compose -p "ai-$APP" --project-directory "$APPHOST" -f - up -d --wait "$@"
   else
     need_docker
     dk compose -p "ai-$APP" -f "$APPHOST/compose.yaml" down

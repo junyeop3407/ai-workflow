@@ -74,6 +74,24 @@ fi
 normq="$(printf '%s' "$cmd" | tr -d "\"'\\\\")"   # 따옴표·역슬래시로 감싸 피하지 못하게
 printf '%s' "$normq" | grep -Eiq '(^|[[:space:]=])--no-v[a-z-]*([[:space:]=]|$)|hooks[[:space:]_.-]*path' \
   && block "git 훅을 건너뛰거나(--no-verify) 훅 경로(core.hooksPath)를 바꾸면 main push 전 테스트 확인(.githooks/pre-push)이 꺼집니다."
+# 셸 확장으로 글자를 실행 때 만들어 피하기(--no-$'v'erify, $'--no-verify', --{no-verify,}, core.hoo${x}ksPath, git -c "$v", git push $opt)
+# → push·commit·merge·-c·config가 든 git 명령에서, 확장($ ` {a,b})이 든 낱말이 옵션(-)이거나 hook·verify 글자를 품거나 확장으로 시작하면 막음.
+# 커밋 메시지(-m 다음 낱말)는 뺀다. 이 검사는 과속 방지턱이고, 진짜 방어는 .githooks/pre-push(main push 때 테스트를 실제로 돌림).
+expv="$(printf '%s' "$cmd" | tr '\n' ' ' | awk -v q="'" '
+  { n = split($0, seg, /[;&|]+/)
+    for (i = 1; i <= n; i++) {
+      s = seg[i]; if (s !~ /(^|[[:space:]])git([[:space:]]|$)/ || s !~ /(push|commit|merge|config|[[:space:]]-c[[:space:]]|hook)/) continue
+      m = split(s, t, /[[:space:]]+/); prev = ""
+      for (j = 1; j <= m; j++) {
+        w = t[j]
+        if (w ~ /\$|`|\{[^}]*,[^}]*\}/ && prev != "-m" && prev != "--message") {
+          st = w; gsub(/[$`"(){},\\]/, "", st); gsub(q, "", st)
+          if (st ~ /^-/ || tolower(st) ~ /hoo|ksp|verif/ || w ~ ("^[\"" q "]?[$`]") || prev == "-c") { print w; exit }
+        }
+        prev = w
+      }
+    } }')"
+[ -n "$expv" ] && block "git 명령에 셸 확장으로 만든 옵션·설정($expv)이 있습니다 — 실행 때 --no-verify·core.hooksPath가 될 수 있어 막습니다. 옵션은 글자 그대로 쓰세요."
 printf '%s' "$cmd" | grep -Eq 'push\.default|remote\.[^[:space:]]*\.push|branch\.[^[:space:]]*\.merge' \
   && block "푸시·추적 설정(push.default·remote.*.push·branch.*.merge)을 바꾸면 임시 브랜치가 main으로 갈 수 있습니다. 설정은 그대로 두세요."
 # 임시 브랜치(wip/…)는 테스트가 실패해도 커밋되므로(check-tests 예외), 다른 브랜치로 가져올 때는
