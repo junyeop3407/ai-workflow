@@ -170,6 +170,13 @@ row "해석: bind 원본 길에 바로가기(안쪽을 가리켜도) → 거부(
 rm -f apps/shop/seedlink 2>/dev/null
 row "원본: 점 든 서비스 이름 → 거부(2)" 2 "$(bad 's/^  db:/  db.x:/')"
 row "원본: ? 명시적 키 → 거부(2)" 2 "$(bad 's/^    image:/    ? privileged\n    : true\n    image:/')"
+row "원본: YAML 태그(!override) → 거부(2)" 2 "$(bad 's/^    ports:/    ports: !override/')"
+row "원본: 여러 줄 글(command: |) → 거부(2)" 2 "$(bad 's/^    image:/    command: |\n      echo hi\n    image:/')"
+row "원본: 알아볼 수 없는 줄 → 거부(2)" 2 "$(bad 's/^    image:/    이상한 줄\n    image:/')"
+row "해석: 네트워크 이름 host → 거부(2)" 2 "$(rbad 's/name: ai-shop_default/name: host/')"
+row "해석: 다른 앱 볼륨 이름(ai-other_dbdata) → 거부(2)" 2 "$(rbad 's/name: ai-shop_dbdata/name: ai-other_dbdata/')"
+row "해석: default 아닌 네트워크 → 거부(2)" 2 "$(rbad 's/^  default:/  hostnet:/')"
+row "해석: 서비스가 다른 네트워크에 붙음 → 거부(2)" 2 "$(rbad 's/      default: null/      outside: null/')"
 row "해석 실패 메시지에 비밀값이 안 나옴" 없음 "$(good; rcfg; sed -i.bak 's/^    image:/    privileged: true\n    image:/' "$FAKE_CFG"; FD up apps/shop 2>&1 | grep -qF hunter2 && echo 있음 || echo 없음)"
 rm -f apps/shop/compose.yaml
 

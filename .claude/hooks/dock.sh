@@ -55,6 +55,9 @@ src_check() {
     if (s ~ /^[[:space:]]*(-[[:space:]]*)?"[^"]*"[[:space:]]*:/ || s ~ ("^[[:space:]]*(-[[:space:]]*)?" q "[^" q "]*" q "[[:space:]]*:")) print NR "번째 줄: 따옴표 붙은 키"
     if (s ~ /^[[:space:]]*(-[[:space:]]*)?(type|source)[[:space:]]*:/) print NR "번째 줄: type:/source:(긴 볼륨 문법) 대신 \"이름:/경로\" 꼴로"
     if (s ~ /^[[:space:]]*(-[[:space:]]*)?\?/) print NR "번째 줄: ? 로 시작하는 키(명시적 키 문법)"
+    if (s ~ /^[[:space:]]*!/ || s ~ /(:|^[[:space:]]*-)[[:space:]]+!/) print NR "번째 줄: YAML 태그(!…) — compose의 !reset·!override 등으로 숨은 설정을 만들 수 있음"
+    if (s ~ /(:|^[[:space:]]*-)[[:space:]]*[|>][-+0-9]*[[:space:]]*$/) print NR "번째 줄: 여러 줄 글(| >) 대신 한 줄로"
+    if (s !~ /^ *[A-Za-z0-9_.-]+[[:space:]]*:([[:space:]]|$)/ && s !~ /^ *-([[:space:]]|$)/) print NR "번째 줄: 알아볼 수 없는 줄(키: 값 또는 - 목록만)"
     if (s ~ /^ *[A-Za-z0-9_.-]+[[:space:]]*:([[:space:]]|$)/) {
       match(s, /^ */); ind = RLENGTH; key = substr(s, ind + 1); sub(/[[:space:]]*:.*/, "", key)
       while (n > 0 && st[n] >= ind) n--
@@ -106,7 +109,7 @@ yaml_flat() {
 }
 # 편 결과를 검사. 문제는 한 줄씩, bind 볼륨 원본은 "BIND<탭>경로"로 내보내 셸이 실제 위치를 따라가 본다.
 resolved_check() {
-  awk -F'\t' -v allow="$(allowed_full)" '
+  awk -F'\t' -v allow="$(allowed_full)" -v app="$APP" '
   BEGIN { al = "\n" allow "\n"
     # 금지 목록이 아니라 허용 목록: 원본 허용 설정(src_check oksvc) + compose가 붙이는 networks. 모르는 설정은 다 거부(모르면 막기)
     oksvc = " image environment ports volumes healthcheck mem_limit cpus pids_limit security_opt depends_on command working_dir read_only tmpfs expose labels networks "
@@ -115,15 +118,22 @@ resolved_check() {
   {
     p = $1; v = $2; top = p; sub(/[.[].*/, "", top)
     if (top !~ /^(name|services|volumes|networks)$/) { print "맨 위에 허용 안 된 설정: " top; next }
+    # 볼륨·네트워크는 이 앱 것만: 이름은 ai-<앱>_<이름> 그대로(이름을 바꿔 host 네트워크·다른 앱 볼륨에 붙기 막기), 네트워크는 default 하나만
     if (top == "volumes" || top == "networks") {
-      if (p ~ /^(volumes|networks)\.[^.]+$/) next
-      k = p; sub(/^[^.]+\.[^.]+\./, "", k); if (k != "name") print top " 설정은 이름만(" p ")"; next }
+      if (!match(p, /^(volumes|networks)\.[a-z0-9][a-z0-9_-]*/)) { print top " 이름이 이상함(" p ")"; next }
+      nn = substr(p, length(top) + 2, RLENGTH - length(top) - 1); k = substr(p, RLENGTH + 2)
+      if (top == "networks" && nn != "default") { print "네트워크는 default 만(" nn ")"; next }
+      if (substr(p, RLENGTH + 1) == "") next
+      if (k != "name") { print top " 설정은 이름만(" p ")"; next }
+      if (v != "ai-" app "_" nn) print top "." nn " 이름은 ai-" app "_" nn " 이어야(" v ")"
+      next }
     if (top != "services") next
     if (!match(p, /^services\.[^.[]+/)) { print "이상한 서비스 경로: " p; next }
     svc = substr(p, 1, RLENGTH); rest = substr(p, RLENGTH + 2); key = rest; sub(/[.[].*/, "", key)
     seen[svc] = 1
     if (svc !~ /^services\.[a-z0-9][a-z0-9_-]*$/) { print "서비스 이름이 이상함: " svc; next }
     if (index(oksvc, " " key " ") == 0) { print svc ": 허용 안 된 설정 " key; next }
+    if (key == "networks" && rest != "networks" && rest != "networks.default") { print svc ": 네트워크는 default 만(" rest ")"; next }
     if (key == "image") { img[svc] = 1; if (index(al, "\n" v "\n") == 0) print svc ": 허용 목록과 다른 이미지 " v }
     if (key == "user" && (v ~ /^(root|0)(:.*)?$/)) print svc ": root로 실행"
     if (key == "security_opt" && v !~ /^no-new-privileges([:=]true)?$/) print svc ": security_opt 는 no-new-privileges 만 (" v ")"
