@@ -44,7 +44,7 @@ junyeop3407/ai-workflow README 보고 이 컴퓨터 세팅해 줘
    `mkdir -p ~/.claude/skills/new-project && "$GH" api repos/junyeop3407/ai-workflow/contents/setup/new-project/SKILL.md -H "Accept: application/vnd.github.raw" > ~/.claude/skills/new-project/SKILL.md`
    → 파일 첫 줄이 `---`이고 `name: new-project`가 있는지 확인.
 6. **선택 (사용자에게 하나씩 묻기, 추천 붙여서)**:
-   - 팀 기본 기술 도구(Java JDK, Node.js, Playwright 브라우저): 첫 앱을 만들 때 필요한 것만 깔아도 됨(추천: 지금은 건너뜀). 설치 명령은 HANDOFF.md "처음 쓰는 컴퓨터 준비" 6번.
+   - 팀 기본 기술 도구(Java JDK, Node.js, Playwright 브라우저): 첫 앱을 만들 때 필요한 것만 깔아도 됨(추천: 지금은 건너뜀). 설치 명령은 docs/setup.md "처음 쓰는 컴퓨터 준비" 6번.
    - 교차 리뷰 도구(아래 "교차 리뷰" 절): Node.js + Codex CLI + Gemini CLI. **교차 리뷰는 필수**라 첫 앱의 4단계 전에는 깔아야 함(추천: 지금 설치). Codex는 ChatGPT 계정 로그인, Gemini는 Google AI Studio 무료 API 키 필요.
 7. **이어서 하던 프로젝트가 있으면**: 사용자에게 저장소 이름을 묻고 `"$GH" repo clone junyeop3407/<이름>` → 그 폴더에서 `HANDOFF.md 읽고 이어서 해 줘`.
 8. **알려 주기** (짧게): 된 것 / 건너뛴 것, 그리고 사용법 — 아무 폴더에서 `/new-project 만들고 싶은 것`. `/new-project`가 목록에 안 보이면 Claude Code를 한 번 껐다 켠다.
