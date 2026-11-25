@@ -1,6 +1,9 @@
 # 교차 리뷰(필수): 이번 작업의 변경분을 만든 AI(Claude)와 다른 AI에게 리뷰받는다. Codex와 Gemini 둘 다 필수.
 # 사용: 저장소 맨 위에서
-#   bash .claude/skills/build-app/cross-review.sh apps/<앱> [기준] [gemini|codex]   (셋째 값이 없으면 gemini)
+#   bash .claude/skills/build-app/cross-review.sh apps/<앱> [기준] [gemini|codex] [final]   (셋째 값이 없으면 gemini)
+#     final: 5단계 cx·gm(배포 전 마지막 검수). 겹치는 리뷰를 한 번에 합친다(.claude/rules/ai-team.md "겹칠 때는 한 번만"):
+#       codex final  = 교차 검수 + 적대적 리뷰(/codex:adversarial-review를 따로 돌리지 않음)
+#       gemini final = 교차 검수 + 기획서 대비 빠진 기능(agy -p 기획 대비 확인을 따로 돌리지 않음)
 #   bash .claude/skills/build-app/cross-review.sh snapshot apps/<앱>
 #     → 지금 상태(커밋 안 한 것·새 파일 포함)를 찍어 해시를 출력. 실제 스테이지(index)는 건드리지 않는다.
 #       4단계에서 plan.md 단계를 시작할 때 찍어 progress.md에 적고, 그 단계가 통과하면 그 해시를 기준으로 Codex 검수.
@@ -35,6 +38,8 @@ fi
 app="${1%/}"
 base="$2"
 reviewer="${3:-gemini}"
+final=""
+case "${4:-}" in final) final=1 ;; "") ;; *) echo "넷째 값은 final 만 됩니다 (받은 값: $4)" >&2; exit 1 ;; esac
 if [ -z "$app" ] || [ ! -d "$app" ]; then
   echo "사용법: bash .claude/skills/build-app/cross-review.sh apps/<앱> [기준] [gemini|codex]" >&2
   exit 1
@@ -135,6 +140,12 @@ related=$(printf '%s\n' "$related" | sed '/^$/d' | grep -Ev "$secret_re" | sort 
       echo
     done
   fi
+  # final + gemini: 기획서 대비 빠진 기능을 보게 기획서도 함께 보낸다
+  if [ -n "$final" ] && [ "$reviewer" = "gemini" ] && [ -f "$app/docs/requirements.md" ]; then
+    echo "===== $app/docs/requirements.md (기획서) ====="
+    cat "$app/docs/requirements.md"
+    echo
+  fi
 } > "$input"
 
 prompt="너는 시니어 코드 리뷰어다. 아래 변경사항을 리뷰해라.
@@ -144,6 +155,14 @@ prompt="너는 시니어 코드 리뷰어다. 아래 변경사항을 리뷰해�
 - 확실하지 않은 지적은 '추정'이라고 표시할 것.
 - 문제가 없으면 '문제 없음'이라고만 답할 것.
 - 파일을 만들거나 고치지 말고, 답만 할 것."
+# final: 배포 전 마지막 검수. 따로 돌리던 리뷰를 이 한 번에 합친다(같은 코드를 두 번 보내지 않음)
+if [ -n "$final" ] && [ "$reviewer" = "codex" ]; then
+  prompt="$prompt
+- 배포 전 마지막 검수다. 위에 더해 적대적 리뷰도 할 것: 공격자·악의적 사용자 입장에서 권한 우회, 입력 조작, 동시 요청(경쟁 상태), 데이터 유출, 실패 시 열린 채로 남는 곳을 찾아 항목 앞에 '공격:'을 붙일 것."
+elif [ -n "$final" ] && [ "$reviewer" = "gemini" ]; then
+  prompt="$prompt
+- 배포 전 마지막 검수다. 위에 더해 맨 끝의 기획서(requirements.md)와 코드를 비교해, 기능·수용 기준(F1-1 …) 중 코드에 없거나 다르게 만든 것을 '기획 누락: <번호> — <이유>'로 적을 것. 문제와 누락이 모두 없으면 '문제 없음'."
+fi
 
 # 2. 리뷰 요청 (1라운드만). 빈 임시 폴더에서 실행: 보낸 내용만 보고 저장소의 다른 파일은 못 본다.
 sandbox=$(mktemp -d)

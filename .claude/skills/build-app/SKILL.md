@@ -33,7 +33,7 @@ description: Use when the user asks to build a new app or program in this reposi
 | 2 ★ 설계 | opt·ok-opt | 설계안 3개(쉬운 것부터, 테스트 도구·설치 여부) + 점수표 + 디자인 방향 2~3개 + 사전 부검 → 사장이 고름 | `design.md`, `premortem.md` | `ref/2-design.md` · superpowers:brainstorming |
 | 3 ★ 테스트 | tl·ok-tl·tc·lock | 아래 "3단계" | `tests.md`, `tests/`, `tests/.approved` | 이 파일 · superpowers:test-driven-development |
 | 4 ★ 구현 | ip·ok-ip·ui∥dd·ok-ui·ok-dd·bb·cb·bf·cf | 계획 모드 → 디자인팀(DESIGN.md+시안)·백엔드팀(데이터·기능 목록) ★ → 구현 루프(bb → bf) → 단계마다 Codex 빠른 검수 | `plan.md`, `progress.md`, `NOTES.md` | `ref/4-build.md` · superpowers:writing-plans, subagent-driven-development |
-| 5 리뷰 | ug·tr·qa·cx·gm | qa-reviewer → Codex → Gemini(각 1라운드), 진짜 문제만 고침 | `review.md`, `review_codex.md`, `review_result.md` | `ref/5-review.md` · superpowers:requesting-code-review |
+| 5 리뷰 | ug·tr·qa·cx·gm | qa-reviewer → Codex `final`(+적대적) → Gemini `final`(+기획 대비), 각 1라운드, 진짜 문제만 고침 | `review.md`, `review_codex.md`, `review_result.md` | `ref/5-review.md` · superpowers:requesting-code-review |
 | 6 ★ 보고 | dv·ex·rt·sa·sc·ok-qa·pub·dep | 점검·점수·레드팀 → QA 보고 → 사장 확인 → 공개 여부 | 앱·루트 `HANDOFF.md` | `ref/6-release.md` · superpowers:verification-before-completion |
 
 앱 `HANDOFF.md`를 만들거나 `테스트 실행:`·`포트:` 줄을 고칠 때: `ref/app-handoff.md`.

@@ -24,6 +24,14 @@ Claude Code는 지휘자다: 일을 나누고, 맞는 직원(모델·외부 AI)�
 | UI 화면을 새로 만들었을 때 | 스크린샷을 `agy -p`로 2차 검토 |
 | 같은 버그에서 3번 넘게 막혔을 때 | `/codex:rescue --background` |
 | 완성도 90%를 넘겨 배포하기 전 | `/codex:adversarial-review` 1번 + 레드팀 + `agy -p`로 기획 대비 빠진 기능 확인 |
+- **겹칠 때는 한 번만**: 앱 작업(`/build-app`, `apps/<앱>/state.json` 있음) 안에서는 그래프 노드가 같은 시점의 리뷰를 맡는다. 위 표의 것을 따로 또 돌리지 않는다.
+  | 위 표 | 앱 작업 안에서는 이것 1번으로 |
+  |---|---|
+  | 기능 끝 `/codex:review` | cb·cf(plan 단계마다 Codex 빠른 검수) |
+  | 배포 전 `/codex:adversarial-review` | cx — `cross-review.sh … codex final`(교차 + 적대적 리뷰를 한 번에) |
+  | 배포 전 레드팀 | rt(`red-team` 에이전트) |
+  | 배포 전 `agy -p` 기획 대비 빠진 기능 | gm — `cross-review.sh … gemini final`(교차 + 기획서 대비를 한 번에) |
+  - 그래프가 없는 시점(UI 스크린샷 `agy -p`, 3번 막힘 `/codex:rescue`)과 앱 작업 밖에서는 위 표대로.
 - **금지**: 코덱스 리뷰 게이트(`--enable-review-gate`) — 응답마다 리뷰가 돌아 자동 루프와 겹치면 Claude·코덱스 한도가 함께 빨리 닳는다. 응답마다·파일마다 리뷰하지 않는다.
 - 사소한 지적(취향·이름)은 모아 두었다가 마지막에 한 번에. 버그·보안만 즉시 고친다.
 

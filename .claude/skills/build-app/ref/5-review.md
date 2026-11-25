@@ -8,11 +8,11 @@
 | 언제 | 누가 | 범위 | 결과 파일 |
 |---|---|---|---|
 | 4단계, plan.md 단계 하나가 통과할 때마다 | Codex | 그 단계 변경분(기준 = 단계 시작 때 찍은 `snapshot` 해시) | `docs/review_codex.md` (덮어씀) |
-| 5단계 ② | Codex | 4단계 시작부터 전체(기준 = HANDOFF `리뷰 기준:`) | `docs/review_codex.md` |
-| 5단계 ③ | Gemini | 같은 전체 | `docs/review_result.md` |
+| 5단계 ② cx | Codex `final` (교차 + 적대적 리뷰) | 4단계 시작부터 전체(기준 = HANDOFF `리뷰 기준:`) | `docs/review_codex.md` |
+| 5단계 ③ gm | Gemini `final` (교차 + 기획서 대비 빠진 기능) | 같은 전체 + `requirements.md` | `docs/review_result.md` |
 5단계 순서는 **qa-reviewer(Claude) → Codex → Gemini**, 각 1라운드.
 
-1. **실행**: `bash .claude/skills/build-app/cross-review.sh apps/<앱> <기준> [codex|gemini]` (셋째 값을 안 주면 gemini)
+1. **실행**: `bash .claude/skills/build-app/cross-review.sh apps/<앱> <기준> [codex|gemini] [final]` (셋째 값을 안 주면 gemini). **5단계 cx·gm은 반드시 `final`** — 배포 전 적대적 리뷰·기획 대비 확인을 여기서 한 번에 하므로 `/codex:adversarial-review`·`agy -p` 기획 대비를 따로 돌리지 않는다(ai-team.md "겹칠 때는 한 번만"). 4단계 cb·cf는 `final` 없이. cb·cf가 기능 끝 리뷰이므로 `/codex:review`도 따로 안 돌린다.
    - 기준점 찍기(4단계 단계 시작 때): `bash .claude/skills/build-app/cross-review.sh snapshot apps/<앱>` → 나온 해시를 `progress.md`에. 실제 스테이지는 건드리지 않는다.
    - 리뷰 기준(5단계)은 4단계 구현을 시작하기 직전 커밋. 4단계를 시작할 때 `git rev-parse --short HEAD`를 HANDOFF의 `리뷰 기준:` 줄에 적어 둔다. (기준을 안 주면 커밋 전이면 `git diff`, 브랜치 작업이면 `git diff main...HEAD`)
    - 스크립트가 변경분 + 변경된 파일 전체 + 그 파일을 import·호출하는 주요 파일을 `docs/review_input.txt`(커밋 안 함)로 묶고, 같은 질문(버그·보안·예외 처리 누락·성능만, 심각도·파일명·줄 번호·이유·수정 제안, 불확실하면 '추정')으로 보낸다. **`.env`·키 파일·`samples/`는 스크립트가 빼고 보낸다.**
@@ -25,5 +25,5 @@
    - 각 지적이 실제로 맞는지 **코드를 직접 확인**해서 맞는 것만 고친다. 고치기 전에 회귀 테스트 먼저(`tests/test_review_fixes.*`), 고치기는 5회 루프("구현 루프" 6번).
    - **두 곳 이상(qa-reviewer·Codex·Gemini)이 같은 문제를 지적하면 우선순위를 올린다.**
    - **심각도 '높음'인데 판단이 애매한 것은 고치지 않는다.** 구현~QA 보고 사이에는 묻지 않으므로 `docs/ask-later.md`에 근거·추천을 적고 ok-qa 보고에 "사장 확인 필요"로 올린다.
-   - 각 결과 파일(`review.md`·`review_codex.md`·`review_result.md`, ug는 `ui-check.md`) 맨 아래 `## Claude 판단` 절에 지적마다 한 줄: `- [맞음] <지적> — 해결: <앱 폴더 기준 파일>:<줄> — 담당: bf|bb|ui` (아직이면 `해결: 아직`) / `- [틀림] <지적> — 이유: …`. 완성도 점수(sc)가 이 줄을 읽고, 해결 줄이 실제로 있어야 ✓로 센다(graph.md "파일 형식").
+   - 각 결과 파일(`review.md`·`review_codex.md`·`review_result.md`, ug는 `ui-check.md`) 맨 아래 `## Claude 판단` 절에 지적마다 한 줄: `- [맞음] <지적> — 해결: <앱 폴더 기준 파일>:<줄> — 담당: bf|bb|ui` (아직이면 `해결: 아직`) / `- [틀림] <지적> — 이유: …`. `공격:`·`기획 누락:` 항목도 같은 방식으로 판단한다(기획 누락은 담당 bf|bb, 기획서가 틀렸으면 ask-later). 완성도 점수(sc)가 이 줄을 읽고, 해결 줄이 실제로 있어야 ✓로 센다(graph.md "파일 형식").
 3. **마무리**: 고친 뒤 테스트를 다시 돌려 깨진 게 없는지 확인한다. **리뷰는 1라운드만.** 고친 코드를 다시 Codex·Gemini에 돌리지 않는다. 6단계 QA 보고에 `Codex: 반영 N / 미반영 N(이유) · Gemini: 반영 N / 미반영 N(이유) · 사장 확인 필요` 한 줄로 정리한다.
