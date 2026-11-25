@@ -15,6 +15,11 @@ mode="$1"
 G="$(cd "$(dirname "$0")" && pwd)/../skills/build-app/graph.sh"
 LOCKSH="$(cd "$(dirname "$0")" && pwd)/lock.sh"
 
+# 테스트 출력 발췌(토큰 절약, graph.sh brief와 같음): 실패·에러 줄(최대 10) + 마지막 3줄, 실패 줄이 없으면 마지막 15줄
+brief() { awk '{ sub(/\r$/, ""); a[NR]=$0 } tolower($0) ~ /(fail|error|✘|✗|×|expected|assert|exception|timeout|실패)/ && !(($0) in seen) && n<10 { seen[$0]=1; m[++n]=NR }
+  END { if (n==0) { for (i=(NR>15?NR-14:1); i<=NR; i++) print a[i]; exit }
+        for (i=1;i<=n;i++) print substr(a[m[i]],1,200); print "…"; for (i=(NR>3?NR-2:1); i<=NR; i++) print substr(a[i],1,200) }'; }
+
 # 앱 하나의 검사 줄 실행: run_app <앱> <줄 이름> → RUN_OUT, 종료 코드 0 통과 / 1 실패 / 3 허용 안 된 명령 / 4 줄 없음
 run_app() {
   local app="$1" key="$2" handoff cmd
@@ -116,7 +121,7 @@ while IFS= read -r app; do
 --- apps/$app: $RUN_OUT ---" ;;
     *) failed="$failed $app"; report="$report
 --- apps/$app $key 실패 (명령: $RUN_CMD) ---
-$(printf '%s\n' "$RUN_OUT" | tail -n 30)" ;;
+$(printf '%s\n' "$RUN_OUT" | brief)" ;;
   esac
 done <<< "$apps"
 
