@@ -44,7 +44,7 @@ junyeop3407/ai-workflow README 보고 이 컴퓨터 세팅해 줘
    `mkdir -p ~/.claude/skills/new-project && "$GH" api repos/junyeop3407/ai-workflow/contents/setup/new-project/SKILL.md -H "Accept: application/vnd.github.raw" > ~/.claude/skills/new-project/SKILL.md`
    → 파일 첫 줄이 `---`이고 `name: new-project`가 있는지 확인.
 6. **선택 (사용자에게 하나씩 묻기, 추천 붙여서)**:
-   - 팀 기본 기술 도구(Java JDK, Node.js, Playwright 브라우저): 첫 앱을 만들 때 필요한 것만 깔아도 됨(추천: 지금은 건너뜀). 설치 명령은 HANDOFF.md "처음 쓰는 컴퓨터 준비" 6번.
+   - 팀 기본 기술 도구(Java JDK, Node.js, Playwright 브라우저): 첫 앱을 만들 때 필요한 것만 깔아도 됨(추천: 지금은 건너뜀). 설치 명령은 docs/setup.md "처음 쓰는 컴퓨터 준비" 6번.
    - 교차 리뷰 도구(아래 "교차 리뷰" 절): Node.js + Codex CLI + Gemini CLI. **교차 리뷰는 필수**라 첫 앱의 4단계 전에는 깔아야 함(추천: 지금 설치). Codex는 ChatGPT 계정 로그인, Gemini는 Google AI Studio 무료 API 키 필요.
 7. **이어서 하던 프로젝트가 있으면**: 사용자에게 저장소 이름을 묻고 `"$GH" repo clone junyeop3407/<이름>` → 그 폴더에서 `HANDOFF.md 읽고 이어서 해 줘`.
 8. **알려 주기** (짧게): 된 것 / 건너뛴 것, 그리고 사용법 — 아무 폴더에서 `/new-project 만들고 싶은 것`. `/new-project`가 목록에 안 보이면 Claude Code를 한 번 껐다 켠다.
@@ -98,7 +98,7 @@ GH=gh; command -v gh >/dev/null || GH="/c/Program Files/GitHub CLI/gh.exe"; mkdi
 | 4 서브에이전트(agents) | 테스트 실행·분리 리뷰·레드팀을 따로 돌려 요약만 받음. 디자인 ∥ 데이터 설계는 동시에 | [.claude/agents/](.claude/agents/) | 에이전트 파일 3개 | 전부 |
 | 5 하네스(훅·권한) | 실패 상태 커밋·강제 푸시·비밀값·승인 테스트 변경·state.json 직접 편집을 시스템으로 막음 | [.claude/hooks/](.claude/hooks/), [settings.json](.claude/settings.json) | `bash .claude/hooks/test-hooks.sh --settings` | 전부 |
 | 6 루프(자동 루프·progress.md·횟수 제한) | 구현은 Stop 훅이 통과 검사를 돌려 통과까지 혼자 돎. 15회·같은 실패 3연속·점수 5바퀴·2바퀴 정체면 보고 | [graph-stop.sh](.claude/hooks/graph-stop.sh), [graph.sh](.claude/skills/build-app/graph.sh) | `bash .claude/hooks/test-graph.sh` | 전부 |
-| 7 툴링(MCP·팀·워크트리) | MCP(context7 문서, chrome-devtools 점검), 외부 AI 교차 검수(Codex·Gemini), 팀 단위 역할. 리뷰 시점: 기능 하나 완료 → `/codex:review`, 배포 전(완성도 90% 넘김) → `/codex:adversarial-review` + 레드팀 + `agy -p` 검토. 리뷰 게이트는 끔 | [settings.json](.claude/settings.json), [cross-review.sh](.claude/skills/build-app/cross-review.sh), [ai-team.md](.claude/rules/ai-team.md) | `claude mcp list` | 부분 — 워크트리는 안 씀(같은 폴더에서 bb → bf 순서로 동시 수정을 피함), 에이전트 팀 대신 서브에이전트 |
+| 7 툴링(MCP·팀·워크트리) | MCP(context7 문서, chrome-devtools 점검), 외부 AI 교차 검수(Codex·Gemini), 팀 단위 역할. 리뷰 시점: 기능 하나 완료 → `/codex:review`, 배포 전(완성도 90% 넘김) → `/codex:adversarial-review` + 레드팀 + `agy -p` 검토. 앱 작업 안에서는 그래프 노드(cb·cf, cx·gm `final`, rt)가 같은 리뷰를 한 번만 맡음. 리뷰 게이트는 끔 | [settings.json](.claude/settings.json), [cross-review.sh](.claude/skills/build-app/cross-review.sh), [ai-team.md](.claude/rules/ai-team.md) | `claude mcp list` | 부분 — 워크트리는 안 씀(같은 폴더에서 bb → bf 순서로 동시 수정을 피함), 에이전트 팀 대신 서브에이전트 |
 | 8 그래프(graph.md·state.json·graph.sh) | 노드·실패 엣지·멈추는 곳 다섯, 문제는 담당 노드로만 되돌림, 상태는 앱마다 state.json | [graph.md](.claude/skills/build-app/graph.md), [graph.sh](.claude/skills/build-app/graph.sh) | `bash .claude/skills/build-app/graph.sh lint` | 전부 |
 | 9 루프크래프트(예약 대신 세션 시작 점검) | 세션을 열 때 진행 중 앱 상태·테스트 점검, 7일마다 주간 회고 묻기 | [session-start.sh](.claude/hooks/session-start.sh) | [docs/last-weekly-review.txt](docs/last-weekly-review.txt) | 부분 — 사장 컴퓨터를 켜 두지 않아서 예약 작업 대신 일부러 세션 시작 때로 바꿈 |
 | 10 자기 개선(에이전트 메모리·/weekly-review) | 리뷰·레드팀 에이전트가 자주 나오는 문제를 메모리에, 주간 회고가 반복된 실수 → 규칙 후보 최대 3개 | [qa-reviewer.md](.claude/agents/qa-reviewer.md), [red-team.md](.claude/agents/red-team.md), [weekly-review](.claude/skills/weekly-review/SKILL.md) | `/weekly-review` | 부분 — 메모리 폴더(`.claude/agent-memory/`)는 첫 리뷰 때 생겨 아직 없음, 규칙은 사장이 고른 것만 반영 |

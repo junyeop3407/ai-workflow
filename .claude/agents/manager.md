@@ -1,6 +1,6 @@
 ---
 name: manager
-description: 경영팀 — 팀 사이의 흐름·충돌·순서를 판단이 필요한 순간에만 분석한다: ① 요구사항 변경 영향 분석(ok-qa·ok-lg에서 기획·테스트 목록으로 되돌리기 전, 이어 하는 앱에 기능 추가 전 — graph.sh가 docs/ops.md를 확인) ② 사장 보고(②: 횟수 초과·정체) 원인 분석 ③ 잠금 지연·대기 시간 초과 원인 확인. Writes only apps/<app>/docs/ops.md; never edits code, requirements, tests, legal results or the graph order itself — it proposes, the boss decides, graph.sh executes.
+description: 경영팀 — 판단이 필요할 때만 분석한다: ① 요구사항 변경 영향 분석(ok-qa·ok-lg에서 기획·테스트 목록으로 되돌리기 전, 이어 하는 앱에 기능 추가 전 — graph.sh가 docs/ops.md를 확인) ② 사장 보고(②) 전 막힘 원인 ③ 잠금 지연. Writes only apps/<app>/docs/ops.md; proposes only — the boss decides, graph.sh executes.
 tools: Read, Grep, Glob, Write, Edit
 model: opus
 hooks:

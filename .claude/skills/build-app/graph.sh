@@ -32,6 +32,10 @@ NT="$T/nodes"; FP="$T/fails"; CT="$T/checklist"; KV="$T/kv"; AP="$T/ap"; LG="$T/
 
 NOW() { date '+%Y-%m-%d %H:%M'; }
 say() { printf '%s\n' "$*"; }
+# 테스트 출력 발췌(토큰 절약): 실패·에러 줄(최대 10, 중복 제거, 줄당 200자) + 마지막 3줄. 실패 줄이 없으면 마지막 15줄.
+brief() { awk '{ sub(/\r$/, ""); a[NR]=$0 } tolower($0) ~ /(fail|error|✘|✗|×|expected|assert|exception|timeout|실패)/ && !(($0) in seen) && n<10 { seen[$0]=1; m[++n]=NR }
+  END { if (n==0) { for (i=(NR>15?NR-14:1); i<=NR; i++) print a[i]; exit }
+        for (i=1;i<=n;i++) print substr(a[m[i]],1,200); print "…"; for (i=(NR>3?NR-2:1); i<=NR; i++) print substr(a[i],1,200) }'; }
 die() { local c="$1"; shift; printf '%s\n' "$*" >&2; exit "$c"; }
 # 사장 답·이유: 따옴표·역슬래시·탭·줄바꿈을 지우고 낱말 단위로 200바이트 안쪽만(글자 중간에서 자르지 않음)
 clean() { printf '%s' "$1" | tr '\t\r\n"\\' '     ' | awk '{s=""; for(i=1;i<=NF;i++){ if (length(s)+length($i)>200) break; s=s (s==""?"":" ") $i } print s}'; }
@@ -270,7 +274,7 @@ count_ok() {
 }
 tests_ok() { # 테스트 실행 줄 통과 + 개수 확인. 실패면 TESTS_MSG
   if ! run_tests; then TESTS_MSG="테스트 실패:
-$(printf '%s\n' "$TEST_OUT" | tail -n 15)"; return 1; fi
+$(printf '%s\n' "$TEST_OUT" | brief)"; return 1; fi
   count_ok || { TESTS_MSG="테스트 개수 확인 실패: $COUNT_MSG"; return 1; }
 }
 
@@ -454,7 +458,7 @@ run_check() { # 노드의 ⚙️ 검사. 실패면 CHECK_MSG 와 함께 1
     -|"") return 0 ;;
     lock) lock_ok || { CHECK_MSG="테스트 잠금 파일이 없거나 해시가 다릅니다."; return 1; } ;;
     backend) run_tests 백엔드 || { CHECK_MSG="백엔드 테스트 실패:
-$(printf '%s\n' "$TEST_OUT" | tail -n 15)"; return 1; } ;;
+$(printf '%s\n' "$TEST_OUT" | brief)"; return 1; } ;;
     tests) tests_ok || { CHECK_MSG="$TESTS_MSG"; return 1; }
            lock_ok || { CHECK_MSG="승인된 테스트 해시가 다릅니다(사장 허락 없이 바뀜)."; return 1; } ;;
     perf) local r; r="$(perf_check)"; printf '%s\n' "$r" | grep -q '^fail' && { CHECK_MSG="수치 미달: $(printf '%s\n' "$r" | grep '^fail' | cut -d' ' -f2,4- | paste -sd, -)"; return 1; } ;;
@@ -889,11 +893,11 @@ cmd_status() {
   [ "$1" = "--short" ] && { status_short; return; }
   status_short
   local id s
+  # 노드별 상태를 상태마다 한 줄로 묶는다(34줄 → 몇 줄, 토큰 절약). 되돌아온 노드는 횟수를 붙인다.
   say "노드별:"
   for id in $(ids); do
-    s="$(st "$id")"
-    printf '  %-6s %-24s %s%s\n' "$id" "$(nname "$id")" "$s" "$( [ "$(nnum "$id" retries)" != 0 ] && echo " (되돌아옴 $(nnum "$id" retries))")"
-  done
+    printf '%s\t%s%s\n' "$(st "$id")" "$id" "$( [ "$(nnum "$id" retries)" != 0 ] && echo "(되돌아옴 $(nnum "$id" retries))")"
+  done | awk -F'\t' '{ if (!($1 in l)) o[++n]=$1; l[$1]=l[$1] " " $2 } END { for (i=1;i<=n;i++) printf "  %s:%s\n", o[i], l[o[i]] }'
   [ -n "$(kget resume)" ] && say "고친 뒤 갈 곳: $(kget resume)"
   [ -n "$(kget queue)" ] && say "고칠 차례 대기: $(kget queue)"
   [ -n "$(kget lf.from)" ] && say "마지막 실패: $(kget lf.from) → $(kget lf.to) ($(kget lf.reason), $(kget lf.at))"

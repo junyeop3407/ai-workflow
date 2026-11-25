@@ -1,0 +1,82 @@
+# 작업장 변경 기록 (완료된 로드맵 자세히)
+
+루트 `HANDOFF.md` 로드맵에서 옮긴 자세한 기록이다. 왜 이렇게 만들었는지 찾을 때만 읽는다(`grep -n`으로 필요한 줄만).
+
+## 로드맵 (2026-11-25까지)
+| 단계 | 내용 | 상태 |
+|---|---|---|
+| 0~3 | 폴더 구조, 규칙(CLAUDE.md), `/build-app` 스킬, 훅 | ✅ 준비됨 |
+| 그래프 | `build-app/graph.md`(노드 32·실패 엣지·멈추는 곳 다섯·체크리스트 20 대응) + `apps/<앱>/state.json` + `graph.sh`(순서 강제) + 훅(SessionStart·UserPromptSubmit·Stop 자동 루프·state 직접 편집 막기). 사장 명령 0번(첫 잠금 자동 `auto-lock.sh`, /goal 대신 Stop 훅 자동 루프, 올리기는 Claude가 실행), 구현~QA 보고 사이 질문 0번(`ask-later.md`), 완성도 90%(필수 관문 + 점수, `graph.sh score`), bb(백엔드: JUnit + api.md 예시 `api-check.sh`, `templates/backend.sh`) → bf 순서. 시험 `test-graph.sh` 59개·`test-hooks.sh --settings` 129개 | ✅ 2026-11-20 |
+| 그래프 검증 고침 | ① 테스트 개수 확인: bf·tr·sc가 exit 0만 믿지 않고 출력에서 개수를 읽어 통과 ≥ 승인된 테스트 수·건너뜀 0일 때만 통과, 못 읽으면 거부(`run.sh`를 `exit 0`으로 위조하는 길 차단, `graph.sh tcount`, Playwright·Vitest·Jest·pytest·Maven·Gradle·node --test). 바뀐 준비 코드(run.sh·conftest·fixtures·config)는 qa가 review.md `## 준비 코드 변경`에 파일마다 적어야 통과 ② AI 노드 "내는 것" 파일이 있고 비어 있지 않아야 pass ③ "서버 없음"·"화면 없음" 건너뛰기 연쇄 ④ pass에 표에 없는 다음 노드 → 거부. 자동 보안 리뷰 지적 3개도 고침(준비 코드 경로는 글자 그대로 비교, 점 파일·러너 설정 포함, 기준은 qa 통과 때만 남겨 첫 qa가 전부 봄). 시험 `test-graph.sh` 104개·`test-hooks.sh --settings` 129개. 남은 위험: run.sh가 합계 줄을 echo로 꾸미면 graph.sh는 못 가림(qa 준비 코드 리뷰가 잡음) | ✅ 2026-11-20 |
+| 백엔드 SOLID | `.claude/rules/backend-solid.md`(원칙별 뜻·Spring 적용·위반 신호, 과한 추상화도 위반, 기준 "바깥 연결이거나 종류 2개 이상이면 인터페이스"). 확인: bb 때 QA팀이 ArchUnit `ArchitectureTest`를 JUnit에 넣어 위반 시 `./gradlew test` 실패 · cross-review.sh 요청문에 SOLID 점검 · qa-reviewer가 `[중간]`(`원칙: S/O/L/I/D/과함`) 지적. 시험 test-graph·test-hooks 통과. 사장 OK. 견본 `templates/ArchitectureTest.java`(ArchUnit 1.5.1, 규칙 6개) — context7 대신 공식 웹 문서·GitHub 소스로 확인(사장 허락). 깨끗한 견본 코드 6/6 통과, 심어 둔 위반 4개 모두 잡음 | ✅ 2026-11-22 |
+| 앞단계 보완 | 분석 `docs/front-stage-review.md`(사장 레퍼런스 3개 + Anthropic·grill-me·Spec Kit·EARS·Shape Up·사전 부검). 반영 ①~⑧: 성공 기준·빈칸 점검표 인터뷰(`SKILL.md` "기획 인터뷰", 견본 `templates/requirements.md`), Gemini 기획서 비판(`doc-review.sh`, agy), 사전 부검(`docs/premortem.md`), 수용 기준 `F1-1`, graph.sh 검사 `req`·`trace`·`undecided`, 되돌리기 어려운 동작 확인 절차, ★ 검토 요청 틀. 추가 ⑨~⑬도 반영: 수용 기준마다 `— 예:` 예시, 출시 안내문 3문장 + 예상 질문, 기능 `[1차|나중·꼭|많을수록|놀람]`(1차만으로 처음부터 끝까지 한 번 돌기, 나중은 테스트·점수에서 빠짐), ★기획 검토 때 회색 상자 화면 초안(`docs/wireframe/`, 절차만) | ✅ 2026-11-22 |
+| 조직 개편 ① 개발팀 | 사장의 "AI 가상오피스 조직 명세"(비서 제외)를 적용. 정한 것: Codex = 개발팀 **리뷰·통합 확인**(구현 안 함, 교차 리뷰 독립 유지), 백엔드·프론트는 **진짜 팀 에이전트** `backend-dev`·`frontend-dev`(sonnet, bb·bf에서 실제로 코드를 짬, 메인은 통합·업무 요청서·커밋). 파일 경계 훅 `team-files.sh`(Edit·Write 즉시 차단 + Bash로 쓴 것은 맡기기 직전 `mark`·받은 직후 `check`로 저장소 전체 비교, **목록에 없는 파일은 기본 거부** — 테스트·러너 설정·package.json·vite.config·`docs/`·.gitignore·state.json은 둘 다 못 고침, 경로는 저장소 기준·대소문자 무시·`//` `./` `../` 거부). 자동 보안 리뷰 지적 4개(경로 우회 2·check 범위·기본 허용) + 2차 4개(이름 바꾸기로 숨기기·기준점 파일 고쳐 쓰기 → 기준 표를 git 객체 해시로 메인이 들고 있음·Windows 특수 이름·무시 파일 내용/git 설정 비교) 반영. 조직도·책임표·업무 요청서 `docs/org.md`. 자동 루프(Stop 훅)는 메인에 그대로. 시험 test-hooks --settings 166개·test-graph 통과 | ✅ 2026-11-23 |
+| 조직 개편 ② 법무팀 | 분석 `docs/org-phase2-review.md`(사장 OK: 법무 → 잠금 도구 → 경영 순서). `legal` 에이전트(opus, `docs/legal.md`만 씀·Bash 없음, 법률 자문 아님). 그래프 노드 `lg`(ok-req 뒤, 검사 `legal`: 안내 문구·판정 줄 형식·근거·RED는 조치·기획서 외부 자료 모두 판정) → `ok-lg`(★ YELLOW·RED는 조건부·대체·빼기, 대체·빼기면 req로). 외부 자료·개인정보가 둘 다 없으면 "법무 해당 없음"으로 둘 다 건너뜀. 기획서 견본에 `## 외부 자료·데이터`·`## 개인정보`. sa에서 출시 전 법무 점검, 체크리스트 20 → 22개(21 라이선스 고지, 22 RED 안 씀·YELLOW 조건대로). 시험 test-hooks --settings 172개·test-graph 통과 | ✅ 2026-11-23 |
+| 조직 개편 ③ 잠금 도구 | 자원별 잠금 `.claude/hooks/lock.sh`(사장의 동시성 명세): `state:<앱>`(graph.sh 쓰는 명령 전부, 쓰기 직전 세대 번호 확인) · `env:port:<번호>`(테스트 실행은 HANDOFF `포트:` 줄마다, 없으면 `env:port:default` 한 줄, `backend.sh`도). 원자적 번호표(mkdir)·FIFO·잡은 프로세스가 끝났을 때만 회수(시간만 지나면 '지연' 표시)·세대 번호·다시 들어가기·기록 `.git/locks/log`. git 커밋·푸시는 git 자체 잠금이 있고 실패가 안전해서 안 잠금. 만들다 찾은 버그: 치워진 번호를 다시 받으면 죽은 대기자가 남의 차례를 가져감 → 번호표에 고유 꼬리표 + 내 번호표가 없으면 그만둠. 시험 `test-lock.sh` 22개(3번 연속 통과)·test-hooks 172개·test-graph(잠금 6개 추가) 통과 | ✅ 2026-11-23 |
+| 조직 개편 ④ 경영팀 | `manager` 에이전트(opus, `docs/ops.md`만 씀·Bash 없음, 제안만 — 순서·잠금은 직접 안 바꿈). 부르는 때: ① 요구사항 변경(먼저 묻기 `사장` 실패 엣지 = ok-qa→tl·req, ok-lg→req) — **graph.sh가 fail 전에 `## 영향 분석: <출발> → <보낼 곳>`(영향·다시 돌 노드·추천)과 출발 ★ 승인 기록을 확인, 없으면 거부** ② 사장 보고(②) 전 막힘 분석 ③ 잠금 지연. 순서·상태·브레이크는 graph.sh·lock.sh가 그대로 함(중복 없음). 시험 test-hooks --settings 177개·test-lock 22개·test-graph 통과 | ✅ 2026-11-23 |
+| 두 컴퓨터(집 Windows ↔ 밖 Mac) | 세션 시작 동기화 점검(받을 것·푸시 잊음·두 갈래·원격 임시 브랜치·커밋 안 한 변경·지난번 컴퓨터, 원격은 fetch로 읽기만). **사장 결정: 임시 브랜치 `wip/<앱>`에서만 실패 상태 커밋 허용**(check-tests), main으로 가는 뒷문은 guard-git이 막음(그대로 merge·cherry-pick·pull, `…:main` 푸시 — `merge --squash` 뒤 테스트 통과 커밋만). 원격 wip 삭제는 안전 검사가 훅 완화를 막아 사장이 `!`로 직접. 자동 보안 리뷰 지적(글자 막기 우회 7개)으로 **마지막 방어선 git 훅 `.githooks/pre-push`** 추가: main으로 가는 커밋은 체크아웃·깨끗한 상태에서 바뀐 앱 테스트를 실제로 돌려 통과만(세션 시작 훅이 `core.hooksPath` 연결, `--no-verify`·훅 경로 바꾸기 차단). `git -c …`·`--git-dir`처럼 옵션을 끼우면 커밋·강제 푸시 검사를 통째로 건너뛰던 기존 빈틈도 고침. `/handoff`에 옮길 때 절차·`마지막 작업 컴퓨터:` 줄. 시험 스크립트 Mac sed 호환(`sedi`, `{…;}`, CRLF는 awk). 시험 test-hooks --settings 193개·test-lock 22개·test-graph 통과(Mac 실행은 아직) | ✅ 2026-11-23 |
+| Docker 1단계 | 분석 `docs/docker-review.md`. **`.claude/hooks/dock.sh`** = Docker로 가는 유일한 입구(check·pin·run·up·down·ps·clean, `--dry-run` 미리보기): 허용 이미지(`templates/docker/images.txt`, 다이제스트는 `pin`이 실제 조회해 amd64·arm64 둘 다 있을 때만 고정 — 지어내지 않음, 고정 전엔 실행 거부), run은 늘 `--rm --cap-drop ALL --security-opt no-new-privileges --read-only --pids-limit` + 메모리·CPU·시간 상한 + root 아님 + 앱 폴더만 `/workspace` + 기본 네트워크 없음 + 포트는 127.0.0.1(그 포트 잠금), up은 compose를 줄 단위로 검사(허용 이미지@다이제스트, 127.0.0.1 포트, 이름 볼륨·앱 안 ./경로만, 비밀값은 `${변수}`, privileged·build·network_mode·소켓·YAML 앵커 금지), down은 볼륨 안 지움. **`guard-docker.sh`** = docker·podman 직접 호출·Docker 소켓 차단(따옴표 안 글자는 실행하는 꼴(bash -c·eval…)일 때만 검사). 견본 `templates/docker/compose.yaml`(연습용 PostgreSQL). 시험 `test-dock.sh` 50개(Docker 없이)·test-hooks 통과. **Docker 실제 실행은 아직**(설치 뒤 `dock.sh check` → `pin`) | ✅ 2026-11-23 |
+| Docker 1단계 보안 보강 | 자동 보안 리뷰 지적 반영. ① **compose 두 번 검사**: 원본 파일은 허용된 설정 이름만(서비스 15개·맨 위 services·volumes, 이름 붙은 볼륨은 이름만)·흐름 문법(`${변수}` 제외)·따옴표 키·탭·`type:`/`source:` 거부 → **`docker compose config` 해석 결과**를 awk로 펴서(`yaml_flat`, 모르는 꼴은 거부) 볼륨 종류 volume·bind·tmpfs만·bind 실제 위치가 앱 안·포트 전부 `host_ip 127.0.0.1`·privileged·cap_add 등 금지·security_opt는 no-new-privileges만·root 아님·이미지 허용 목록과 같음·볼륨/네트워크는 이름만·맨 위 secrets·configs 금지 → **검사한 그 결과 그대로를 표준 입력으로 `up -f -`**(바꿔치기 막기). 서비스 이름 자리에 옵션 금지. 실패 메시지에 비밀값 안 나옴 ② guard-docker: `d"o"cker`·`doc\ker`·`\docker`·따옴표로 감싼 Windows 경로 막음, "과속 방지턱, 진짜 방어는 dock.sh"를 docs/org.md·docker-review.md에 ③ guard-git: push·commit·merge·config가 든 git 명령에서 셸 확장(`$'…'`·`${…}`·`$(…)`·백틱·`{a,b}`)으로 만든 옵션·hook 글자·`$변수` 옵션 막음(커밋 메시지 `-m` 뒤는 뺌) ④ 바로가기: `apps/` 자체·앱 폴더 바로가기 거부, 저장소 실제 위치 기준 비교, 앱 안 바로가기·**NTFS 정션**(Git Bash `find -type l` + `dir /AL /S /B`)은 **앱 밖·없는 곳을 가리킬 때만** 거부(안쪽끼리는 허용 — `node_modules/.bin`이 바로가기라서, HANDOFF 원래 계획 "하나라도 있으면 거부"에서 바꿈), docker 실행 바로 직전에 한 번 더. **2차 자동 보안 리뷰 3개도 반영**: 서비스 이름에 점(`db.x` — 경로가 섞여 privileged가 숨음)·`?` 명시적 키 거부, 해석 결과 검사를 금지 목록 → **허용 목록**(원본 허용 설정 + networks), bind 원본은 앱 폴더까지 올라가는 길에 바로가기가 하나도 없어야 하고 띄우기 직전에 앱 폴더·bind 원본을 다시 확인(남은 틈: 그 직후 Docker가 경로를 여는 아주 짧은 순간). 시험 test-dock 83개·test-hooks --settings 252개·test-lock 22개·test-graph 142개 통과. 허용 목록 방식이라 실제 `compose config`가 붙이는 설정이 더 있으면 처음엔 거부될 수 있음 → 2단계에서 확인해 목록에 더함. **실제 Docker 출력(`compose config` 꼴, `-f -`로 띄우기)은 2단계 설치 뒤 확인 필요.** | ✅ 2026-11-24 |
+| GitHub main 브랜치 보호 | **사장 결정: 기본 보호**. GitHub 설정으로 main **강제 푸시·삭제 금지, 관리자(사장 계정)도 예외 없음**. main에 바로 올리는 방식(/handoff)은 그대로. 테스트 통과 필수(GitHub Actions + PR 필수)는 안 켬 — 켜려면 자동 검사 워크플로를 새로 만들고 /handoff·훅을 PR 방식으로 바꿔야 해서(첫 앱 뒤에 다시 판단). 테스트 확인은 계속 `.githooks/pre-push`. 확인: `gh api repos/junyeop3407/ai-workflow/branches/main/protection` | ✅ 2026-11-24 |
+| Docker 2단계 (**다음**) | 사장이 Windows·Mac 두 대에 Docker Desktop 설치 → `bash .claude/hooks/dock.sh check` → `bash .claude/hooks/dock.sh pin` → images.txt 커밋 → 견본 compose로 `dock.sh up` 한 번 돌려 해석 결과 검사(yaml_flat)가 실제 `compose config` 출력을 잘 읽는지 확인. (3차 자동 보안 리뷰 지적은 2026-11-24에 고침: 볼륨·네트워크 이름은 `ai-<앱>_<이름>` 그대로·네트워크는 default 하나만, 원본의 YAML 태그 `!…`·여러 줄 글 `| >`·알아볼 수 없는 줄 거부) | ⬜ 나중(사장 설치 뒤) |
+| 다음 | 첫 앱으로 새 조직(개발팀 에이전트·법무·경영·잠금) 흐름을 실제로 한 바퀴 돌려 보기 | ⬜ 다음 |
+| 교차 리뷰 | Codex + Gemini CLI 리뷰 (**둘 다 필수**, 변경분 1라운드, README 참고) | ✅ 준비됨 |
+| 구조 정리 | CLAUDE.md를 rules·skills·hooks·agents로 나눔 (130 → 93줄) | ✅ 2026-11-01 |
+| 견본 파일 | 변환 전/후 실제 파일 → 요구사항·테스트 정답 (`/build-app` "견본 파일"), 실제 데이터 파일 커밋 차단(guard-git, `samples/`) | ✅ 2026-11-13 |
+| 고르기 돕기 | 2단계 설계안 점수표(가중치 4기준·추천), 참고 디자인 분석(유지할 것 / 바꿀 것 / 베끼지 말 것 → DESIGN.md "참고") | ✅ 2026-11-13 |
+| 최신 웹 표준 | Chrome 팀 modern-web-guidance 플러그인 자동 설치·자동 사용(화면 코드 전 가이드 검색, iOS Safari Baseline 기준, 이어 하는 앱 현대화 점검) | ✅ 2026-11-16 |
+| MCP 2개 | context7(라이브러리 버전별 최신 문서, 코드 작성 전 자동), chrome-devtools-mcp(6단계 콘솔·네트워크·성능 점검) 플러그인 자동 설치·자동 사용. playwright·github·filesystem MCP는 기존 기능(Playwright 테스트·webapp-testing, gh CLI, 기본 파일 도구)과 겹쳐서 넣지 않음 | ✅ 2026-11-16 |
+| 출시 전 점검 | 결제는 PG사 결제 확인 후 주문 확정, 가입 동의 필수·선택 분리, 하단 개인정보처리방침·약관·사업자 정보, 연습용·운영 DB 분리 + 매일 백업 (security.md 5·6절, 배포 전 체크리스트 12 → 16개) | ✅ 2026-11-18 |
+| ECC 플러그인 | affaan-m/ECC 자동 설치(공식 저장소만). 쓰는 것만 골라 `/build-app` 스킬 표에 넣음: 시장조사, Spring·테스트 작성 가이드, 빌드 에러 해결·언어별 리뷰 에이전트. 앱 밖: 말투·마케팅·콘텐츠·SEO. ECC 훅은 꺼 둠(이 저장소 훅과 겹치고 매 동작마다 느려짐), 계획·TDD 명령은 superpowers와 겹쳐 안 씀, ECC 규칙(rules)은 항상 읽혀 컨텍스트를 먹어서 안 넣음 | ✅ 2026-11-19 |
+| 품질 점검 | Safari 엔진(webkit)·폰 화면 호환성 테스트, axe 자동 접근성 검사, 성능 기준(LCP 2.5초·CLS 0.1), 서버 앱 부하 테스트(동시 50명, localhost), 탐색·사용성 점검(선택, 예상 비용 고지 후 사장 "진행해"일 때만). 배포 전 체크리스트 16 → 20개 | ✅ 2026-11-18 |
+| 루프 다섯 칸 | 목표·채점표에 더해 **일지**(`progress.md`)·**브레이크**(15회·같은 실패 3회·디버깅 후에도 안 되면 사장 보고)·**잠금**(`tests/.approved` 해시, 사장만 잠금, Bash로 고쳐도 커밋 직전·Stop에서 잡음). 4단계는 `/goal` 한 문장. 교차 리뷰 Codex+Gemini(4단계 단계별 Codex, 5단계 Claude→Codex→Gemini). "해결됐어요 / 아직이에요" 확인 루프. qa-reviewer·red-team 메모리(공개 저장소라 일반 패턴만), `/weekly-review`. 예약 작업 없이 세션 시작 때 점검. 훅 시험 `test-hooks.sh` | ✅ 2026-11-20 |
+
+## 파일 구조 (2026-11-25 기준)
+```
+├── CLAUDE.md                              매번 알아야 하는 사실만 (소개·명령·역할·팀 기술)
+├── .claude/rules/                         주제별 규칙 (해당 경로를 열 때만 불러짐)
+│   ├── security.md                        보안 (apps/**)
+│   ├── web-and-mobile.md                  웹+안드로이드·iOS 화면 (화면 코드·Capacitor)
+│   └── testing.md                         테스트 (tests/·테스트 파일)
+├── .claude/agents/                        서브에이전트 (요약만 돌려줌)
+│   ├── test-runner.md                     테스트 실행 → N/N + 실패 요약
+│   ├── qa-reviewer.md                     5단계 분리 리뷰 (memory: project)
+│   ├── red-team.md                        6단계 실행 중인 앱 공격 (memory: project)
+│   ├── backend-dev.md                     개발팀 백엔드: bb에서 서버 코드 작성 (서버 파일만)
+│   ├── frontend-dev.md                    개발팀 프론트엔드: bf에서 화면 코드 작성 (화면 파일만)
+│   ├── legal.md                           법무팀: lg·sa에서 docs/legal.md 판정 (그 파일만)
+│   └── manager.md                         경영팀: 요구사항 변경 영향·막힘·잠금 지연 → docs/ops.md (그 파일만)
+├── docs/org.md                            조직도·책임표·개발팀 파일 경계·업무 요청서
+├── .claude/hooks/team-files.sh            개발팀 에이전트 파일 경계 (훅 + check·owner)
+├── .claude/hooks/lock.sh                  자원별 잠금 (state:<앱>·env:port, FIFO·회수·세대 번호) + test-lock.sh
+├── .claude/agent-memory/                  qa-reviewer·red-team 메모리 (커밋됨, 일반 패턴만)
+├── .claude/skills/weekly-review/SKILL.md  /weekly-review 주간 회고 (반복된 실수 → 규칙 후보 최대 3개)
+├── docs/last-weekly-review.txt            마지막 주간 회고 날짜 (세션 시작 훅이 읽음)
+├── .claude/skills/handoff/SKILL.md        /handoff 단계 마무리 (HANDOFF → 커밋 → 푸시)
+├── HANDOFF.md                             이 파일 (저장소 전체 현황)
+├── README.md                              이 견본을 새 프로젝트에 쓰는 방법
+├── .claude/skills/build-app/SKILL.md      /build-app 절차 (앱 하나 한 바퀴, 기능 추가도 같은 순서)
+├── .claude/skills/build-app/templates/    견본 파일 (파이썬으로 테스트하는 앱용 run.sh)
+├── .claude/skills/build-app/cross-review.sh  교차 리뷰 (필수, Codex·Gemini CLI로 변경분 리뷰, snapshot 기준점)
+├── .claude/skills/build-app/graph.md      앱 흐름(노드·실패 엣지·멈추는 곳 다섯·체크리스트·점수 규칙). graph.sh가 이 표만 읽음
+├── .claude/skills/build-app/graph.sh      순서 강제·state.json 쓰기 (status/pass/fail/approve/loop/score/migrate/lint …)
+├── .claude/skills/build-app/api-check.sh  api.md 예시 요청을 로컬 서버에 보내 응답 비교 (bb 노드)
+├── .claude/skills/build-app/templates/backend.sh  백엔드 테스트 견본(JUnit → 서버 켜기 → api 확인 → 끄기, 안전장치)
+├── .claude/hooks/graph-stop.sh            Stop: 구현 자동 루프·진행 노드 두고 멈추기 막기
+├── .claude/hooks/graph-prompt.sh          UserPromptSubmit: 앱 작업이면 현재 노드 한 줄
+├── .claude/hooks/guard-state.sh           state.json 직접 편집 막기
+├── .claude/hooks/auto-lock.sh             첫 테스트 잠금 자동(한 번만, ok-tl 승인 기록 필요)
+├── .claude/hooks/test-graph.sh            그래프 시험 + 가짜 앱 이야기 표
+├── setup/new-project/SKILL.md             "새 프로젝트 만들어 줘" 개인 스킬 (README 참고해 설치)
+├── .claude/hooks/check-tests.sh           테스트 실패 시 커밋·완료 보고 막기
+├── .claude/hooks/guard-git.sh             강제 푸시·기록 수정·저장소 삭제 차단, 커밋 전 비밀값·.env·절대경로 검사
+├── .claude/hooks/protect-tests.sh         승인 목록(.approved)의 테스트 수정 시 사장 확인 창, Claude의 승인 스크립트 실행 차단
+├── .claude/hooks/approve-tests.sh         승인된 테스트 잠그기 (사장만 ! 로 실행)
+├── .claude/hooks/check-approved.sh        커밋 직전·Stop에서 승인 테스트 해시 비교
+├── .claude/hooks/flag-redteam.sh          민감한 파일 수정·커밋 시 .redteam-needed 표시
+├── .claude/hooks/agent-memory-only.sh     검수 에이전트는 자기 메모리 폴더만 쓰게
+├── .claude/hooks/session-start.sh         세션 시작 점검·주간 회고 알림 (예약 작업 대신)
+├── .claude/hooks/test-hooks.sh            훅 시험 (가짜 입력으로 막힘/통과 표)
+├── .claude/settings.json                  훅 등록, 플러그인 켜기(superpowers·modern-web-guidance·context7·chrome-devtools-mcp·ecc), ECC 훅 끄기
+└── apps/                                  앱 하나당 폴더 하나 (아직 비어 있음)
+```
